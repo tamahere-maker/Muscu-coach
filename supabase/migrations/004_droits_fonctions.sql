@@ -1,0 +1,3 @@
+-- Les fonctions SECURITY DEFINER ne sont appelables que par des utilisateurs connectés.
+revoke execute on function public.accepter_invitation(uuid), public.athlete_du_plan(uuid), public.athlete_du_programme(uuid), public.avancer_programme(uuid), public.est_coach_de(uuid), public.est_principal_de(uuid), public.peut_voir(uuid) from public, anon;
+grant execute on function public.accepter_invitation(uuid), public.athlete_du_plan(uuid), public.athlete_du_programme(uuid), public.avancer_programme(uuid), public.est_coach_de(uuid), public.est_principal_de(uuid), public.peut_voir(uuid) to authenticated;

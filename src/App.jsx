@@ -1,0 +1,53 @@
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { useSession } from './lib/session'
+import { supabase } from './lib/supabase'
+import { Toast } from './lib/ui'
+import Connexion from './pages/Connexion'
+import Invitation from './pages/Invitation'
+import CoachAthletes from './pages/CoachAthletes'
+import AthleteAccueil from './pages/AthleteAccueil'
+import Exercices from './pages/Exercices'
+import Aliments from './pages/Aliments'
+
+export default function App() {
+  const { session, profil } = useSession()
+  if (session === undefined) return null
+
+  return (
+    <>
+      <header className="top">
+        <div className="top-in">
+          <div className="brand">Muscu <b>Coach</b></div>
+          <span className="spacer" />
+          {profil && <span className="who">{profil.nom || session.user.email} · {profil.role === 'coach' ? 'Coach' : 'Athlète'}</span>}
+          {session && <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Déconnexion</button>}
+        </div>
+        {profil && (
+          <nav className="tabs">
+            <NavLink to="/">{profil.role === 'coach' ? 'Athlètes' : 'Accueil'}</NavLink>
+            <NavLink to="/exercices">Exercices</NavLink>
+            <NavLink to="/aliments">Aliments</NavLink>
+          </nav>
+        )}
+      </header>
+      <main>
+        <Routes>
+          <Route path="/invitation/:token" element={<Invitation />} />
+          {!session ? (
+            <Route path="*" element={<Connexion />} />
+          ) : !profil ? (
+            <Route path="*" element={null} />
+          ) : (
+            <>
+              <Route path="/" element={profil.role === 'coach' ? <CoachAthletes /> : <AthleteAccueil />} />
+              <Route path="/exercices" element={<Exercices />} />
+              <Route path="/aliments" element={<Aliments />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          )}
+        </Routes>
+      </main>
+      <Toast />
+    </>
+  )
+}
