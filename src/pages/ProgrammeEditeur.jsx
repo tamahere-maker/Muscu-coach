@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, toast } from '../lib/ui'
+import { blocs } from '../lib/supersets'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const CHAMPS_EX = [['series', 'Séries', 1], ['reps', 'Reps', 1], ['charge_kg', 'Charge (kg)', 0.5], ['repos_s', 'Repos (s)', 15]]
@@ -23,7 +24,7 @@ export default function ProgrammeEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('programmes')
-      .select('id, nom, description, prix_eur, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s))')
+      .select('id, nom, description, prix_eur, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe))')
       .eq('id', id).single()
     if (!data) return
     setProg(data)
@@ -72,7 +73,8 @@ export default function ProgrammeEditeur() {
   async function deplacer(liste, i, d, table) {
     const a = liste[i], b = liste[i + d]
     if (!b) return
-    await Promise.all([supabase.from(table).update({ ordre: b.ordre }).eq('id', a.id), supabase.from(table).update({ ordre: a.ordre }).eq('id', b.id)])
+    const sortir = table === 'seance_exercices' ? { groupe: null } : {}
+    await Promise.all([supabase.from(table).update({ ordre: b.ordre, ...sortir }).eq('id', a.id), supabase.from(table).update({ ordre: a.ordre }).eq('id', b.id)])
     charger()
   }
   async function ajouterExercice(e) {
@@ -83,6 +85,21 @@ export default function ProgrammeEditeur() {
     if (error) return toast(error.message)
     dlg.current.close()
     toast(`${e.nom} ajouté`)
+    charger()
+  }
+  // Lie l'exercice j au précédent (superset), ou coupe le superset entre les deux
+  async function lier(s, j) {
+    const l = s.seance_exercices, prec = l[j - 1], cur = l[j]
+    const lies = prec.groupe != null && prec.groupe === cur.groupe
+    const suite = []
+    for (let k = j; k < l.length && (k === j || (cur.groupe != null && l[k].groupe === cur.groupe)); k++) suite.push(l[k])
+    let g
+    if (lies) g = suite.length > 1 ? Math.max(0, ...l.map((x) => x.groupe ?? 0)) + 1 : null
+    else {
+      g = prec.groupe ?? Math.max(0, ...l.map((x) => x.groupe ?? 0)) + 1
+      if (prec.groupe == null) await supabase.from('seance_exercices').update({ groupe: g }).eq('id', prec.id)
+    }
+    await supabase.from('seance_exercices').update({ groupe: g }).in('id', suite.map((x) => x.id))
     charger()
   }
   async function retirer(l) {
@@ -137,27 +154,45 @@ export default function ProgrammeEditeur() {
             </span>
           </div>
           {s.seance_exercices.length === 0 && <p className="empty">Aucun exercice dans cette séance.</p>}
+          <label className="field"><span className="label">Note pour la séance</span>
+            <textarea rows={2} defaultValue={s.note} placeholder="Ex. Échauffement 10 min sur le rameur"
+              onBlur={(e) => e.target.value !== s.note && majSeance(s, { note: e.target.value })} /></label>
           <div>
-            {s.seance_exercices.map((l, j) => exo[l.exercice_id] && (
-              <div key={l.id} className="ex prog-ex">
-                <Anim ex={exo[l.exercice_id]} cls="t" />
-                <div style={{ minWidth: 0 }}>
-                  <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                    <strong>{exo[l.exercice_id].nom}</strong>
-                    <span className="row" style={{ flexWrap: 'nowrap' }}>
-                      <button className="icon-btn" aria-label="Monter" disabled={j === 0} onClick={() => deplacer(s.seance_exercices, j, -1, 'seance_exercices')}>↑</button>
-                      <button className="icon-btn" aria-label="Descendre" disabled={j === s.seance_exercices.length - 1} onClick={() => deplacer(s.seance_exercices, j, 1, 'seance_exercices')}>↓</button>
-                      <button className="icon-btn" aria-label="Retirer" onClick={() => retirer(l)}>×</button>
-                    </span>
+            {blocs(s.seance_exercices).map((b) => (
+              <div key={b.items[0].l.id} className={b.items.length > 1 ? 'superset' : undefined}>
+                {b.items.length > 1 && <span className="label">Superset · {b.items.length} exercices enchaînés, repos après le dernier</span>}
+                {b.items.map(({ l, j }) => exo[l.exercice_id] && (
+                  <div key={l.id}>
+                    {j > 0 && (
+                      <button className="lier" onClick={() => lier(s, j)}>
+                        {b.items[0].j < j ? 'Délier du précédent' : 'Lier au précédent (superset)'}
+                      </button>
+                    )}
+                    <div className="ex prog-ex">
+                      <Anim ex={exo[l.exercice_id]} cls="t" />
+                      <div style={{ minWidth: 0 }}>
+                        <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
+                          <strong>{exo[l.exercice_id].nom}</strong>
+                          <span className="row" style={{ flexWrap: 'nowrap' }}>
+                            <button className="icon-btn" aria-label="Monter" disabled={j === 0} onClick={() => deplacer(s.seance_exercices, j, -1, 'seance_exercices')}>↑</button>
+                            <button className="icon-btn" aria-label="Descendre" disabled={j === s.seance_exercices.length - 1} onClick={() => deplacer(s.seance_exercices, j, 1, 'seance_exercices')}>↓</button>
+                            <button className="icon-btn" aria-label="Retirer" onClick={() => retirer(l)}>×</button>
+                          </span>
+                        </div>
+                        <div className="params">
+                          {CHAMPS_EX.map(([k, lib, pas]) => (
+                            <label key={k} className="field"><span className="label">{lib}</span>
+                              <input type="number" min="0" step={pas} defaultValue={l[k]}
+                                onBlur={(e) => e.target.value !== '' && Number(e.target.value) !== Number(l[k]) && majLigne(l, { [k]: Number(e.target.value) })} /></label>
+                          ))}
+                        </div>
+                        <input type="text" className="note-ex" aria-label={`Note pour ${exo[l.exercice_id].nom}`} defaultValue={l.note}
+                          placeholder="Note pour l’athlète (tempo, placement…)"
+                          onBlur={(e) => e.target.value !== l.note && majLigne(l, { note: e.target.value })} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="params">
-                    {CHAMPS_EX.map(([k, lib, pas]) => (
-                      <label key={k} className="field"><span className="label">{lib}</span>
-                        <input type="number" min="0" step={pas} defaultValue={l[k]}
-                          onBlur={(e) => e.target.value !== '' && Number(e.target.value) !== Number(l[k]) && majLigne(l, { [k]: Number(e.target.value) })} /></label>
-                    ))}
-                  </div>
-                </div>
+                ))}
               </div>
             ))}
           </div>

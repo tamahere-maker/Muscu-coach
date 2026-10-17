@@ -3,6 +3,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, toast } from '../lib/ui'
 import { MATERIEL, NIVEAUX, OBJECTIFS } from '../lib/listes'
+import { blocs } from '../lib/supersets'
 
 export default function AthleteAccueil() {
   const { profil } = useSession()
@@ -14,7 +15,7 @@ export default function AthleteAccueil() {
     supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     supabase.from('programmes')
-      .select('nom, description, seances(id, ordre, nom, seance_exercices(id, ordre, series, reps, charge_kg, exercice:exercices(id, nom, sprite)))')
+      .select('nom, description, seances(id, ordre, nom, note, seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(id, nom, sprite)))')
       .eq('athlete_id', profil.id).eq('actif', true).maybeSingle().then(({ data }) => setProg(data))
     supabase.from('athlete_profiles').select('*').eq('athlete_id', profil.id).single().then(({ data }) => setF(data))
   }, [profil.id])
@@ -49,11 +50,18 @@ export default function AthleteAccueil() {
           {[...prog.seances].sort(parOrdre).map((s) => (
             <div key={s.id} className="ovl">
               <h3>{s.nom}</h3>
-              {[...s.seance_exercices].sort(parOrdre).map((l) => (
-                <div key={l.id} className="ex">
-                  <Anim ex={l.exercice} cls="t" />
-                  <div><strong>{l.exercice.nom}</strong>
-                    <div className="sub">{l.series} × {l.reps}{Number(l.charge_kg) ? ` · ${l.charge_kg} kg` : ''}</div></div>
+              {s.note && <p className="consigne">{s.note}</p>}
+              {blocs([...s.seance_exercices].sort(parOrdre)).map((b) => (
+                <div key={b.items[0].l.id} className={b.items.length > 1 ? 'superset' : undefined}>
+                  {b.items.length > 1 && <span className="label">Superset · enchaîne les {b.items.length} exercices, puis repos</span>}
+                  {b.items.map(({ l }) => (
+                    <div key={l.id} className="ex">
+                      <Anim ex={l.exercice} cls="t" />
+                      <div><strong>{l.exercice.nom}</strong>
+                        <div className="sub">{l.series} × {l.reps}{Number(l.charge_kg) ? ` · ${l.charge_kg} kg` : ''}</div>
+                        {l.note && <p className="consigne">{l.note}</p>}</div>
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

@@ -184,3 +184,10 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .macros4 div{background:var(--surface-2);border-radius:8px;padding:8px 4px}
 .macros4 b{display:block;font-size:18px}
 .macros4 input{width:100%;text-align:center;padding:4px}
+.superset{border-left:3px solid var(--accent);padding-left:10px;margin-block:8px;display:grid;gap:4px}
+.superset .ex{border-top:0}
+.lier{border:1px dashed var(--line);background:none;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--muted);margin:6px 0 0 82px}
+.note-ex{margin-top:8px}
+.field textarea{font:inherit;color:inherit;resize:vertical}
+.consigne{background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:14px;margin:6px 0 0}
+@media (max-width:480px){.lier{margin-left:58px}}
