@@ -174,3 +174,13 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .params input{padding:6px 8px}
 @media (max-width:480px){.prog-ex{grid-template-columns:48px minmax(0,1fr)}.prog-ex .anim.t{width:48px}.params{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .icon-btn:disabled{opacity:.35}
+.scanner{display:grid;gap:12px}
+.viseur{position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3}
+.viseur video{width:100%;height:100%;object-fit:cover;display:block}
+.viseur .cadre{position:absolute;inset:30% 12%;border:3px solid var(--accent);border-radius:8px;box-shadow:0 0 0 999px rgba(0,0,0,.35)}
+.viseur p{position:absolute;inset:auto 0 12px;text-align:center;color:#fff;margin:0}
+.produit{display:grid;gap:10px}
+.macros4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;text-align:center}
+.macros4 div{background:var(--surface-2);border-radius:8px;padding:8px 4px}
+.macros4 b{display:block;font-size:18px}
+.macros4 input{width:100%;text-align:center;padding:4px}
