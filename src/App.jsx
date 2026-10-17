@@ -15,7 +15,8 @@ import Programmes from './pages/Programmes'
 import ProgrammeEditeur from './pages/ProgrammeEditeur'
 import Plans from './pages/Plans'
 import PlanEditeur from './pages/PlanEditeur'
-import AthleteBilans from './pages/AthleteBilans'
+import AthleteSuivi from './pages/AthleteSuivi'
+import MesProgres from './pages/MesProgres'
 import BilanDetail from './pages/BilanDetail'
 import BilanFormulaire from './pages/BilanFormulaire'
 
@@ -47,7 +48,7 @@ export default function App() {
               </>
             ) : (
               <>
-                <NavLink to="/" className={({ isActive }) => (isActive || location.pathname.startsWith('/seance') ? 'active' : undefined)} end>Entraînement</NavLink>
+                <NavLink to="/" className={({ isActive }) => (isActive || /^\/(seance|progres)/.test(location.pathname) ? 'active' : undefined)} end>Entraînement</NavLink>
                 <NavLink to="/nutrition">Nutrition</NavLink>
               </>
             )}
@@ -69,7 +70,8 @@ export default function App() {
               <Route path="/nutrition" element={profil.role === 'coach' ? <Plans /> : <AthleteNutrition />} />
               {profil.role === 'athlete' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
-              {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteBilans />} />}
+              {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
+              {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteSuivi />} />}
               {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
               <Route path="/bilans/:id" element={<BilanDetail />} />
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}

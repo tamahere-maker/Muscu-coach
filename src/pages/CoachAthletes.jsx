@@ -108,7 +108,7 @@ export default function CoachAthletes() {
                     <Metabolisme p={p} />
                   </div>
                   <span className="row">
-                    <Link className="btn ghost sm" to={`/athletes/${s.athlete.id}`}>Bilans{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
+                    <Link className="btn sm" to={`/athletes/${s.athlete.id}${nouveaux > 0 ? '?vue=bilans' : ''}`}>Suivi{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
                     {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
                     {plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>

@@ -85,9 +85,10 @@ export default function AthleteEntrainement() {
 
       {faites.length > 0 && (
         <div className="card">
-          <h2>Mes dernières séances</h2>
+          <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Mes dernières séances</h2>
+            <Link className="btn ghost sm" to="/progres">Statistiques et historique</Link></div>
           <div className="liste">
-            {faites.slice(0, 8).map((f) => (
+            {faites.slice(0, 5).map((f) => (
               <div key={f.id}><span>{f.nom}</span><span className="sub">{dateFr(f.date + 'T12:00')} · {pluriel(f.series_realisees.length, 'série')}</span></div>
             ))}
           </div>

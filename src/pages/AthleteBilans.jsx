@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { JOURS, TYPES_COACH, dateFr } from '../lib/bilans'
 
 // Suivi des bilans d'un athlète par le coach : jour du bilan hebdomadaire, demandes, historique
-export default function AthleteBilans() {
-  const { id } = useParams()
+export default function AthleteBilans({ id }) {
   const { profil } = useSession()
-  const nav = useNavigate()
   const [athlete, setAthlete] = useState(null)
   const [bilans, setBilans] = useState(null)
   const [jour, setJour] = useState('')
@@ -46,11 +44,6 @@ export default function AthleteBilans() {
 
   return (
     <>
-      <div>
-        <button className="linkbtn" onClick={() => nav('/')}>← Mes athlètes</button>
-        <h1 style={{ marginTop: 8 }}>Bilans de {athlete.nom}</h1>
-      </div>
-
       <div className="card">
         <div className="grid2">
           <label className="field"><span className="label">Bilan hebdomadaire</span>
