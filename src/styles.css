@@ -203,3 +203,7 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .repas-ath .ligne{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:4px 0}
 @media (max-width:480px){nav.tabs{gap:0}nav.tabs a{flex:1 1 auto;text-align:center;padding:10px 4px;font-size:13px}}
 @media (max-width:640px){nav.tabs a{border-bottom:0;border-top:3px solid transparent;padding-block:12px}nav.tabs a.active{border-top-color:var(--accent)}}
+.anim.perso{display:grid;place-items:center;background:var(--surface-2);background-image:none;animation:none;color:var(--accent);font-family:var(--display);font-weight:800;font-size:22px}
+.anim.perso.big{font-size:64px}
+.lib-item .anim.perso{font-size:40px}
+.creer{border:1px dashed var(--accent);background:none;border-radius:8px;padding:10px;text-align:left;color:var(--accent);font-weight:600}

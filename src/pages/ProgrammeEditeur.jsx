@@ -4,6 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, toast } from '../lib/ui'
 import { blocs } from '../lib/supersets'
+import NouvelExercice from '../lib/NouvelExercice'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const CHAMPS_EX = [['series', 'Séries', 1], ['reps', 'Reps', 1], ['charge_kg', 'Charge (kg)', 0.5], ['repos_s', 'Repos (s)', 15]]
@@ -20,6 +21,7 @@ export default function ProgrammeEditeur() {
   const [cible, setCible] = useState('')
   const [ajoutDans, setAjoutDans] = useState(null)
   const [q, setQ] = useState('')
+  const [creation, setCreation] = useState(false)
   const dlg = useRef()
 
   async function charger() {
@@ -33,7 +35,7 @@ export default function ProgrammeEditeur() {
   }
   useEffect(() => { charger() }, [id])
   useEffect(() => {
-    supabase.from('exercices').select('id, nom, muscles, materiel, essentiel, sprite').order('id').then(({ data }) => setExos(data ?? []))
+    supabase.from('exercices').select('id, nom, muscles, materiel, essentiel, sprite, cree_par').order('id').then(({ data }) => setExos(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
   }, [profil.id])
@@ -43,7 +45,7 @@ export default function ProgrammeEditeur() {
   const choix = useMemo(() => {
     const t = sansAccent(q.trim())
     return exos.filter((e) => !t || sansAccent(e.nom).includes(t) || e.muscles.some((m) => sansAccent(m).includes(t)))
-      .sort((a, b) => b.essentiel - a.essentiel).slice(0, 40)
+      .sort((a, b) => !!b.cree_par - !!a.cree_par || b.essentiel - a.essentiel).slice(0, 40)
   }, [exos, q])
 
   const majProg = async (champs) => {
@@ -222,21 +224,27 @@ export default function ProgrammeEditeur() {
 
       <div className="row"><button className="linkbtn" onClick={supprimer}>Supprimer ce programme</button></div>
 
-      <dialog ref={dlg} onClose={() => setAjoutDans(null)}>
+      <dialog ref={dlg} onClose={() => { setAjoutDans(null); setCreation(false) }}>
         {ajoutDans && (
           <div className="dlg">
             <div className="dlg-head"><h2>Ajouter à {ajoutDans.nom}</h2>
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
+            {creation ? (
+              <NouvelExercice nomInitial={q} coachId={profil.id} onAnnuler={() => setCreation(false)}
+                onCree={(e) => { setExos((x) => [...x, e]); setCreation(false); ajouterExercice(e) }} />
+            ) : <>
             <input type="search" autoFocus placeholder="Exercice ou muscle" value={q} onChange={(e) => setQ(e.target.value)} />
+            <button className="creer" onClick={() => setCreation(true)}>+ Créer un exercice{q.trim() ? ` « ${q.trim()} »` : ''} absent de la bibliothèque</button>
             <div className="pick-list">
               {choix.map((e) => (
                 <button key={e.id} className="pick" onClick={() => ajouterExercice(e)}>
                   <Anim ex={e} cls="t" />
-                  <span><strong>{e.nom}</strong><br /><small className="sub">{e.muscles.join(', ')} · {e.materiel}</small></span>
+                  <span><strong>{e.nom}</strong>{e.cree_par && <span className="pill"> Perso</span>}<br /><small className="sub">{e.muscles.join(', ')} · {e.materiel}</small></span>
                   <span className="pill acc">Ajouter</span>
                 </button>
               ))}
             </div>
+            </>}
           </div>
         )}
       </dialog>

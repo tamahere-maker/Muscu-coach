@@ -17,7 +17,7 @@ export default function AthleteAccueil() {
     supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     supabase.from('programmes')
-      .select('nom, description, seances(id, ordre, nom, note, seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(id, nom, sprite)))')
+      .select('nom, description, seances(id, ordre, nom, note, seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(id, nom, sprite, consigne, lien_video)))')
       .eq('athlete_id', profil.id).eq('actif', true).maybeSingle().then(({ data }) => setProg(data))
     supabase.from('plans_nutrition')
       .select('nom, description, kcal, proteines, glucides, lipides, repas(id, ordre, nom, note, repas_aliments(id, ordre, grammes, alternatives, aliment:aliments(*))), complements(id, nom, dose, moment)')
@@ -69,7 +69,8 @@ export default function AthleteAccueil() {
                       <Anim ex={l.exercice} cls="t" />
                       <div><strong>{l.exercice.nom}</strong>
                         <div className="sub">{l.series} × {l.reps}{Number(l.charge_kg) ? ` · ${l.charge_kg} kg` : ''}</div>
-                        {l.note && <p className="consigne">{l.note}</p>}</div>
+                        {l.note && <p className="consigne">{l.note}</p>}
+                        {l.exercice.lien_video && <a className="linkbtn" href={l.exercice.lien_video} target="_blank" rel="noreferrer">Voir la vidéo</a>}</div>
                     </div>
                   ))}
                 </div>
