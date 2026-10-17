@@ -18,7 +18,7 @@ export default function CoachAthletes() {
   async function charger() {
     const [c, i] = await Promise.all([
       supabase.from('coachings')
-        .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures), programmes!programmes_athlete_id_fkey(id, nom, actif))')
+        .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif))')
         .eq('coach_id', profil.id).order('created_at'),
       supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at')
         .eq('statut', 'envoyee').order('created_at', { ascending: false }),
@@ -93,6 +93,7 @@ export default function CoachAthletes() {
             {suivis.map((s) => {
               const p = s.athlete.athlete_profiles ?? {}
               const prog = s.athlete.programmes?.find((x) => x.actif)
+              const plan = s.athlete.plans_nutrition?.find((x) => x.actif)
               return (
                 <div key={s.id}>
                   <div className="athlete">
@@ -103,8 +104,12 @@ export default function CoachAthletes() {
                       {p.blessures ? <> · <strong>{p.blessures}</strong></> : null}
                     </span>
                   </div>
-                  {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
-                    : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
+                  <span className="row">
+                    {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
+                      : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
+                    {plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
+                      : <Link className="linkbtn" to="/nutrition">Attribuer un plan</Link>}
+                  </span>
                 </div>
               )
             })}

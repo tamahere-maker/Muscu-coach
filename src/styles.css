@@ -191,3 +191,15 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .field textarea{font:inherit;color:inherit;resize:vertical}
 .consigne{background:var(--surface-2);border-radius:8px;padding:8px 10px;font-size:14px;margin:6px 0 0}
 @media (max-width:480px){.lier{margin-left:58px}}
+.plan-ligne{display:grid;gap:6px;padding:10px 0;border-top:1px solid var(--line)}
+.plan-ligne .qte{width:80px}
+.macros-ligne{margin-left:auto;text-align:right;font-size:12px}
+.plan-ligne .chip .linkbtn{text-decoration:none;font-size:15px;line-height:1}
+.complement{display:grid;grid-template-columns:1.4fr 1fr 1fr auto;gap:8px;align-items:end}
+@media (max-width:480px){.complement{grid-template-columns:1fr 1fr auto}.complement .field:first-child{grid-column:1/-1}}
+.pick-aliment{grid-template-columns:1fr auto}
+.macros4 .ecart b{color:var(--warn)}
+.repas-ath{display:grid;gap:4px}
+.repas-ath .ligne{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:4px 0}
+@media (max-width:480px){nav.tabs{gap:0}nav.tabs a{flex:1 1 auto;text-align:center;padding:10px 4px;font-size:13px}}
+@media (max-width:640px){nav.tabs a{border-bottom:0;border-top:3px solid transparent;padding-block:12px}nav.tabs a.active{border-top-color:var(--accent)}}
