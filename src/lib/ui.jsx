@@ -24,3 +24,6 @@ export function Toast() {
 }
 
 export const fmt = (n, d = 0) => Number(n).toLocaleString('fr-FR', { maximumFractionDigits: d })
+
+// Date du jour (heure locale) au format AAAA-MM-JJ
+export const jourIso = (d = new Date()) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

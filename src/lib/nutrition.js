@@ -33,3 +33,25 @@ export function metabolisme(p) {
 // Ce qui manque au profil pour faire le calcul
 export const manquePourMetabolisme = (p) =>
   [['sexe', 'sexe'], ['poids_kg', 'poids'], ['taille_cm', 'taille'], ['age', 'âge']].filter(([k]) => !p?.[k]).map(([, l]) => l)
+
+// Aliments de substitution : profil de macros le plus proche (part de l'énergie apportée par P, G, L),
+// en privilégiant la même catégorie
+const profilMacros = (x) => {
+  const t = x.proteines * 4 + x.glucides * 4 + x.lipides * 9 || 1
+  return [x.proteines * 4 / t, x.glucides * 4 / t, x.lipides * 9 / t]
+}
+export function substituts(a, aliments, exclus = [], n = 5) {
+  const pa = profilMacros(a)
+  return aliments.filter((b) => b.id !== a.id && !exclus.includes(b.id) && Number(b.kcal) > 0)
+    .map((b) => ({ b, d: profilMacros(b).reduce((s, v, k) => s + Math.abs(v - pa[k]), 0) + (b.categorie === a.categorie ? 0 : 0.35) }))
+    .sort((x, y) => x.d - y.d).slice(0, n).map((x) => x.b)
+}
+
+// Quantité équivalente : autant du macronutriment dominant de l'aliment d'origine (ou autant de calories)
+export function equivalent(a, grammes, b) {
+  const k = ['proteines', 'glucides', 'lipides'].sort((x, y) => a[y] * (y === 'lipides' ? 9 : 4) - a[x] * (x === 'lipides' ? 9 : 4))[0]
+  let q = Number(b[k]) >= 2 ? (a[k] * grammes) / b[k] : (a.kcal * grammes) / b.kcal
+  q = Math.min(q, grammes * 4)
+  if (b.unite_g) return Math.max(0.5, Math.round((q / b.unite_g) * 2) / 2) * b.unite_g
+  return Math.max(5, Math.round(q / 5) * 5)
+}

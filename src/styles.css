@@ -228,3 +228,11 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .a-faire{border-color:var(--accent);border-width:2px;text-decoration:none;color:inherit;gap:4px}
 .badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700}
 .bilan textarea,.card>textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;color:inherit}
+/* Espace athlète : séances, séance guidée, suivi des repas */
+.seance-carte{display:grid;gap:4px;text-decoration:none;color:inherit}
+.seance-carte:hover{border-color:var(--accent)}
+.note-coach{display:grid;gap:4px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:8px;padding:10px 12px}
+.card.note-coach{border-left:4px solid var(--accent)}
+.setlist div{cursor:pointer}
+.food .qte{width:70px}
+@media (max-width:480px){.setcard .stepper{grid-template-columns:36px minmax(0,1fr) 36px;gap:4px}.setcard .stepper input{font-size:18px;padding:8px 0}.setcard .stepper button{height:40px}}
