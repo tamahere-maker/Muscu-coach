@@ -208,3 +208,23 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .lib-item .anim.perso{font-size:40px}
 .creer{border:1px dashed var(--accent);background:none;border-radius:8px;padding:10px;text-align:left;color:var(--accent);font-weight:600}
 .metab{font-size:13px}
+.bilan{display:grid;gap:18px}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.photos.grandes{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.photo{position:relative;aspect-ratio:3/4;border-radius:8px;overflow:hidden;background:var(--surface-2);display:grid;place-items:center;font-weight:600;color:var(--muted)}
+.photo img{width:100%;height:100%;object-fit:cover;display:block}
+.photo .icon-btn{position:absolute;top:4px;right:4px}
+.photo.ajout{border:2px dashed var(--line);cursor:pointer;color:var(--accent)}
+.note-ligne{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-top:1px solid var(--line)}
+.notes5{display:flex;gap:4px}
+.notes5 button{width:40px;height:40px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font-weight:700}
+.notes5 button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.mesures{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.mesures>div{background:var(--surface-2);border-radius:8px;padding:8px 10px;display:grid;gap:2px}
+.mesures b{font-size:18px}
+.jauge{display:inline-flex;gap:3px}
+.jauge i{width:14px;height:8px;border-radius:2px;background:var(--surface-2)}
+.jauge i.on{background:var(--accent)}
+.a-faire{border-color:var(--accent);border-width:2px;text-decoration:none;color:inherit;gap:4px}
+.badge{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;background:var(--accent);color:var(--accent-ink);font-size:11px;font-weight:700}
+.bilan textarea,.card>textarea{width:100%;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 10px;font:inherit;color:inherit}

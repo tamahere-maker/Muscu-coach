@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { TYPES, bilansAFaire, dateFr } from '../lib/bilans'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, fmt, toast } from '../lib/ui'
@@ -12,6 +14,8 @@ export default function AthleteAccueil() {
   const [f, setF] = useState(null)
   const [prog, setProg] = useState(undefined)
   const [plan, setPlan] = useState(undefined)
+  const [bilans, setBilans] = useState(null)
+  const [suivi, setSuivi] = useState(null)
 
   useEffect(() => {
     supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
@@ -27,6 +31,9 @@ export default function AthleteAccueil() {
         const { data: alts } = ids.length ? await supabase.from('aliments').select('id, nom').in('id', ids) : { data: [] }
         setPlan(data && { ...data, alts: Object.fromEntries((alts ?? []).map((a) => [a.id, a.nom])) })
       })
+    supabase.from('bilans').select('id, type, statut, created_at, envoye_at, reponse_coach').eq('athlete_id', profil.id)
+      .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
+    supabase.from('suivi_bilans').select('jour_semaine').eq('athlete_id', profil.id).maybeSingle().then(({ data }) => setSuivi(data))
     supabase.from('athlete_profiles').select('*').eq('athlete_id', profil.id).single().then(({ data }) => setF(data))
   }, [profil.id])
 
@@ -41,7 +48,9 @@ export default function AthleteAccueil() {
     toast(error ? error.message : 'Profil enregistré')
   }
 
-  if (coachs === null || !f || prog === undefined || plan === undefined) return null
+  if (coachs === null || !f || prog === undefined || plan === undefined || bilans === null) return null
+  const aFaire = coachs.length ? bilansAFaire(bilans, suivi) : []
+  const envoyes = bilans.filter((b) => b.statut !== 'demande')
   const parOrdre = (a, b) => a.ordre - b.ordre
 
   return (
@@ -52,6 +61,13 @@ export default function AthleteAccueil() {
           ? `Suivi par ${coachs.map((c) => c.coach?.nom + (c.principal ? ' (coach principal)' : '')).join(', ')}.`
           : 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'}</p>
       </div>
+
+      {aFaire.map((b) => (
+        <Link key={b.id + b.type} className="card a-faire" to={b.id === 'nouveau' ? `/bilan/nouveau?type=${b.type}` : `/bilan/${b.id}`}>
+          <strong>{TYPES[b.type]} à remplir</strong>
+          <span className="sub">Mensurations, photos et ressentis : quelques minutes.</span>
+        </Link>
+      ))}
 
       {prog && (
         <div className="card">
@@ -101,6 +117,20 @@ export default function AthleteAccueil() {
               {plan.complements.map((c) => <div key={c.id} className="ligne"><span>{c.nom}</span><span className="sub">{[c.dose, c.moment].filter(Boolean).join(' · ')}</span></div>)}
             </div>
           )}
+        </div>
+      )}
+
+      {envoyes.length > 0 && (
+        <div className="card">
+          <h2>Mes bilans</h2>
+          <div className="liste">
+            {envoyes.map((b) => (
+              <div key={b.id}>
+                <span>{TYPES[b.type].replace('Bilan demandé par ton coach', 'Bilan ponctuel')} · {dateFr(b.envoye_at)}{b.reponse_coach && <span className="pill ok">Réponse du coach</span>}</span>
+                <Link className="btn ghost sm" to={`/bilans/${b.id}`}>Voir</Link>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

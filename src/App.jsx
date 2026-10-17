@@ -12,6 +12,9 @@ import Programmes from './pages/Programmes'
 import ProgrammeEditeur from './pages/ProgrammeEditeur'
 import Plans from './pages/Plans'
 import PlanEditeur from './pages/PlanEditeur'
+import AthleteBilans from './pages/AthleteBilans'
+import BilanDetail from './pages/BilanDetail'
+import BilanFormulaire from './pages/BilanFormulaire'
 
 export default function App() {
   const { session, profil } = useSession()
@@ -49,6 +52,9 @@ export default function App() {
               {profil.role === 'coach' && <Route path="/programmes" element={<Programmes />} />}
               {profil.role === 'coach' && <Route path="/programmes/:id" element={<ProgrammeEditeur />} />}
               {profil.role === 'coach' && <Route path="/nutrition" element={<Plans />} />}
+              {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteBilans />} />}
+              {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
+              <Route path="/bilans/:id" element={<BilanDetail />} />
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
               <Route path="/exercices" element={<Exercices />} />
               <Route path="/aliments" element={<Aliments />} />
