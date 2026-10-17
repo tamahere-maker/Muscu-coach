@@ -8,6 +8,8 @@ import CoachAthletes from './pages/CoachAthletes'
 import AthleteAccueil from './pages/AthleteAccueil'
 import Exercices from './pages/Exercices'
 import Aliments from './pages/Aliments'
+import Programmes from './pages/Programmes'
+import ProgrammeEditeur from './pages/ProgrammeEditeur'
 
 export default function App() {
   const { session, profil } = useSession()
@@ -25,6 +27,7 @@ export default function App() {
         {profil && (
           <nav className="tabs">
             <NavLink to="/">{profil.role === 'coach' ? 'Athlètes' : 'Accueil'}</NavLink>
+            {profil.role === 'coach' && <NavLink to="/programmes">Programmes</NavLink>}
             <NavLink to="/exercices">Exercices</NavLink>
             <NavLink to="/aliments">Aliments</NavLink>
           </nav>
@@ -40,6 +43,8 @@ export default function App() {
           ) : (
             <>
               <Route path="/" element={profil.role === 'coach' ? <CoachAthletes /> : <AthleteAccueil />} />
+              {profil.role === 'coach' && <Route path="/programmes" element={<Programmes />} />}
+              {profil.role === 'coach' && <Route path="/programmes/:id" element={<ProgrammeEditeur />} />}
               <Route path="/exercices" element={<Exercices />} />
               <Route path="/aliments" element={<Aliments />} />
               <Route path="*" element={<Navigate to="/" replace />} />

@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
-import { toast } from '../lib/ui'
+import { Anim, toast } from '../lib/ui'
 import { MATERIEL, NIVEAUX, OBJECTIFS } from '../lib/listes'
 
 export default function AthleteAccueil() {
   const { profil } = useSession()
   const [coachs, setCoachs] = useState(null)
   const [f, setF] = useState(null)
+  const [prog, setProg] = useState(undefined)
 
   useEffect(() => {
     supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
+    supabase.from('programmes')
+      .select('nom, description, seances(id, ordre, nom, seance_exercices(id, ordre, series, reps, charge_kg, exercice:exercices(id, nom, sprite)))')
+      .eq('athlete_id', profil.id).eq('actif', true).maybeSingle().then(({ data }) => setProg(data))
     supabase.from('athlete_profiles').select('*').eq('athlete_id', profil.id).single().then(({ data }) => setF(data))
   }, [profil.id])
 
@@ -26,7 +30,8 @@ export default function AthleteAccueil() {
     toast(error ? error.message : 'Profil enregistré')
   }
 
-  if (coachs === null || !f) return null
+  if (coachs === null || !f || prog === undefined) return null
+  const parOrdre = (a, b) => a.ordre - b.ordre
 
   return (
     <>
@@ -36,6 +41,25 @@ export default function AthleteAccueil() {
           ? `Suivi par ${coachs.map((c) => c.coach?.nom + (c.principal ? ' (coach principal)' : '')).join(', ')}.`
           : 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'}</p>
       </div>
+
+      {prog && (
+        <div className="card">
+          <h2>{prog.nom}</h2>
+          {prog.description && <p className="sub" style={{ margin: 0 }}>{prog.description}</p>}
+          {[...prog.seances].sort(parOrdre).map((s) => (
+            <div key={s.id} className="ovl">
+              <h3>{s.nom}</h3>
+              {[...s.seance_exercices].sort(parOrdre).map((l) => (
+                <div key={l.id} className="ex">
+                  <Anim ex={l.exercice} cls="t" />
+                  <div><strong>{l.exercice.nom}</strong>
+                    <div className="sub">{l.series} × {l.reps}{Number(l.charge_kg) ? ` · ${l.charge_kg} kg` : ''}</div></div>
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
 
       <form className="card" onSubmit={enregistrer}>
         <h2>Mon profil</h2>

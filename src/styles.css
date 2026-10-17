@@ -169,3 +169,8 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .liste>div:first-child{border-top:0}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.prog-ex{grid-template-columns:72px minmax(0,1fr)}
+.params{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:8px}
+.params input{padding:6px 8px}
+@media (max-width:480px){.prog-ex{grid-template-columns:48px minmax(0,1fr)}.prog-ex .anim.t{width:48px}.params{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.icon-btn:disabled{opacity:.35}
