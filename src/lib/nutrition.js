@@ -19,3 +19,17 @@ export function quantite(a, grammes) {
 }
 
 export const resume = (m) => `${fmt(m.kcal)} kcal · P ${fmt(m.proteines)} · G ${fmt(m.glucides)} · L ${fmt(m.lipides)}`
+
+// Métabolisme de base (Mifflin-St Jeor) et dépense du jour estimée selon le nombre de séances par semaine.
+// Renvoie null tant que le profil est incomplet.
+export function metabolisme(p) {
+  if (!p?.sexe || !p.poids_kg || !p.taille_cm || !p.age) return null
+  const base = 10 * p.poids_kg + 6.25 * p.taille_cm - 5 * p.age + (p.sexe === 'Homme' ? 5 : -161)
+  const s = p.seances_semaine ?? 0
+  const facteur = s === 0 ? 1.2 : s <= 3 ? 1.375 : s <= 5 ? 1.55 : 1.725
+  return { base: Math.round(base), facteur, depense: Math.round(base * facteur) }
+}
+
+// Ce qui manque au profil pour faire le calcul
+export const manquePourMetabolisme = (p) =>
+  [['sexe', 'sexe'], ['poids_kg', 'poids'], ['taille_cm', 'taille'], ['age', 'âge']].filter(([k]) => !p?.[k]).map(([, l]) => l)

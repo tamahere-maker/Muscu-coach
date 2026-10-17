@@ -107,6 +107,8 @@ export default function AthleteAccueil() {
       <form className="card" onSubmit={enregistrer}>
         <h2>Mon profil</h2>
         <p className="sub" style={{ margin: 0 }}>Ton coach s’en sert pour construire ton programme.</p>
+        <div className="field"><span className="label">Sexe</span>
+          <div className="chips">{['Homme', 'Femme'].map((x) => <button type="button" key={x} className="chip" aria-pressed={f.sexe === x} onClick={() => maj('sexe', x)}>{x}</button>)}</div></div>
         <div className="field"><span className="label">Niveau</span>
           <div className="chips">{NIVEAUX.map((n) => <button type="button" key={n} className="chip" aria-pressed={f.niveau === n} onClick={() => maj('niveau', n)}>{n}</button>)}</div></div>
         <div className="field"><span className="label">Objectifs</span>

@@ -207,3 +207,4 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .anim.perso.big{font-size:64px}
 .lib-item .anim.perso{font-size:40px}
 .creer{border:1px dashed var(--accent);background:none;border-radius:8px;padding:10px;text-align:left;color:var(--accent);font-weight:600}
+.metab{font-size:13px}

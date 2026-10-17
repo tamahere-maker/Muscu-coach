@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
+import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -18,7 +19,7 @@ export default function CoachAthletes() {
   async function charger() {
     const [c, i] = await Promise.all([
       supabase.from('coachings')
-        .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif))')
+        .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif))')
         .eq('coach_id', profil.id).order('created_at'),
       supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at')
         .eq('statut', 'envoyee').order('created_at', { ascending: false }),
@@ -103,6 +104,7 @@ export default function CoachAthletes() {
                         .filter(Boolean).join(' · ') || 'Profil pas encore rempli'}
                       {p.blessures ? <> · <strong>{p.blessures}</strong></> : null}
                     </span>
+                    <Metabolisme p={p} />
                   </div>
                   <span className="row">
                     {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
@@ -117,5 +119,16 @@ export default function CoachAthletes() {
         )}
       </div>
     </>
+  )
+}
+
+function Metabolisme({ p }) {
+  const m = metabolisme(p)
+  if (!m) return <span className="sub metab">Métabolisme de base : il manque {manquePourMetabolisme(p).join(', ')} dans le profil de l’athlète.</span>
+  return (
+    <span className="metab">
+      Métabolisme de base <strong className="num">{fmt(m.base)} kcal</strong> · Dépense du jour estimée <strong className="num">{fmt(m.depense)} kcal</strong>
+      <small className="sub"> ({p.seances_semaine ?? 0} séance{(p.seances_semaine ?? 0) > 1 ? 's' : ''}/sem., ×{fmt(m.facteur, 3)})</small>
+    </span>
   )
 }

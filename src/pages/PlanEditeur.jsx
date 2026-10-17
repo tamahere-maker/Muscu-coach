@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
-import { macrosDe, quantite, resume, somme } from '../lib/nutrition'
+import { macrosDe, manquePourMetabolisme, metabolisme, resume, somme } from '../lib/nutrition'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const OBJECTIFS = [['kcal', 'Calories (kcal)'], ['proteines', 'Protéines (g)'], ['glucides', 'Glucides (g)'], ['lipides', 'Lipides (g)']]
@@ -26,7 +26,7 @@ export default function PlanEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom), repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives)), complements(id, nom, dose, moment)')
       .eq('id', id).single()
     if (!data) return
     setPlan(data)
@@ -126,6 +126,13 @@ export default function PlanEditeur() {
         <label className="field"><span className="label">Description</span>
           <input type="text" defaultValue={plan.description} placeholder="Ex. Prise de masse, 2 800 kcal"
             onBlur={(e) => e.target.value !== plan.description && majPlan({ description: e.target.value })} /></label>
+        {!modele && (() => {
+          const ap = plan.athlete?.athlete_profiles, m = metabolisme(ap)
+          return m ? (
+            <p className="note">Métabolisme de base de {plan.athlete.nom} : <strong>{fmt(m.base)} kcal</strong> · dépense du jour estimée : <strong>{fmt(m.depense)} kcal</strong>
+              {plan.kcal !== m.depense && <button type="button" onClick={() => majPlan({ kcal: m.depense })}>Mettre en objectif</button>}</p>
+          ) : <p className="note">Métabolisme de base : il manque {manquePourMetabolisme(ap).join(', ')} dans le profil de l’athlète.</p>
+        })()}
         <span className="label">Objectifs par jour</span>
         <div className="params">
           {OBJECTIFS.map(([k, lib]) => (
