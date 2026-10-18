@@ -259,3 +259,4 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .jours7 .bar{height:8px;border-radius:4px;background:var(--surface-2);overflow:hidden}
 .jours7 .bar i{display:block;height:100%;background:var(--ink)}
 .jours7 button>span:last-child{white-space:nowrap;font-size:13px}
+.copie-prog{display:grid;gap:6px;margin-bottom:8px}

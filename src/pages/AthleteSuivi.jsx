@@ -13,9 +13,14 @@ export default function AthleteSuivi() {
   const [params, setParams] = useSearchParams()
   const vue = VUES.some(([k]) => k === params.get('vue')) ? params.get('vue') : 'seances'
   const [athlete, setAthlete] = useState(null)
+  const [actifs, setActifs] = useState({})
 
   useEffect(() => {
     supabase.from('profiles').select('id, nom, athlete_profiles(seances_semaine)').eq('id', id).single().then(({ data }) => setAthlete(data))
+    Promise.all([
+      supabase.from('programmes').select('id, nom').eq('athlete_id', id).eq('actif', true).maybeSingle(),
+      supabase.from('plans_nutrition').select('id, nom').eq('athlete_id', id).eq('actif', true).maybeSingle(),
+    ]).then(([p, n]) => setActifs({ prog: p.data, plan: n.data }))
   }, [id])
 
   if (!athlete) return null
@@ -30,6 +35,8 @@ export default function AthleteSuivi() {
           {VUES.map(([k, l]) => <button key={k} aria-pressed={vue === k} onClick={() => setParams({ vue: k }, { replace: true })}>{l}</button>)}
         </div>
       </div>
+      {vue === 'seances' && actifs.prog && <div className="row"><Link className="btn ghost sm" to={`/programmes/${actifs.prog.id}`}>Modifier son programme · {actifs.prog.nom}</Link></div>}
+      {vue === 'nutrition' && actifs.plan && <div className="row"><Link className="btn ghost sm" to={`/nutrition/${actifs.plan.id}`}>Modifier son plan · {actifs.plan.nom}</Link></div>}
       {vue === 'seances' && <Progres athleteId={id} objectifSemaine={ap?.seances_semaine} />}
       {vue === 'nutrition' && <AthleteNutrition athleteId={id} lecture />}
       {vue === 'bilans' && <AthleteBilans id={id} />}

@@ -22,7 +22,10 @@ export default function ProgrammeEditeur() {
   const [ajoutDans, setAjoutDans] = useState(null)
   const [q, setQ] = useState('')
   const [creation, setCreation] = useState(false)
+  const [remplace, setRemplace] = useState(null) // ligne dont on change l'exercice
+  const [sources, setSources] = useState(null) // programmes où copier une séance
   const dlg = useRef()
+  const dlgCopie = useRef()
 
   async function charger() {
     const { data } = await supabase.from('programmes')
@@ -39,7 +42,7 @@ export default function ProgrammeEditeur() {
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
   }, [profil.id])
-  useEffect(() => { if (ajoutDans) dlg.current.showModal() }, [ajoutDans])
+  useEffect(() => { if (ajoutDans || remplace) dlg.current.showModal() }, [ajoutDans, remplace])
 
   const exo = useMemo(() => Object.fromEntries(exos.map((e) => [e.id, e])), [exos])
   const choix = useMemo(() => {
@@ -80,6 +83,14 @@ export default function ProgrammeEditeur() {
     charger()
   }
   async function ajouterExercice(e) {
+    if (remplace) {
+      const avant = exo[remplace.exercice_id]?.nom
+      const { error } = await supabase.from('seance_exercices').update({ exercice_id: e.id }).eq('id', remplace.id)
+      if (error) return toast(error.message)
+      dlg.current.close()
+      toast(`${avant} remplacé par ${e.nom}`)
+      return charger()
+    }
     const l = ajoutDans.seance_exercices
     const { error } = await supabase.from('seance_exercices').insert({
       seance_id: ajoutDans.id, exercice_id: e.id, ordre: l.length ? Math.max(...l.map((x) => x.ordre)) + 1 : 0,
@@ -103,6 +114,20 @@ export default function ProgrammeEditeur() {
     }
     await supabase.from('seance_exercices').update({ groupe: g }).in('id', suite.map((x) => x.id))
     charger()
+  }
+  async function copierSeance(seanceId, nom) {
+    const { error } = await supabase.rpc('copier_seance', { s: seanceId, p: id })
+    if (error) return toast(error.message)
+    dlgCopie.current?.open && dlgCopie.current.close()
+    toast(`${nom} copiée dans le programme`)
+    charger()
+  }
+  async function ouvrirCopie() {
+    const { data } = await supabase.from('programmes')
+      .select('id, nom, athlete_id, actif, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, seance_exercices(count))')
+      .or(`athlete_id.is.null,actif.eq.true`).neq('id', id).order('created_at', { ascending: false })
+    setSources((data ?? []).filter((p) => p.seances.length))
+    dlgCopie.current.showModal()
   }
   async function retirer(l) {
     await supabase.from('seance_exercices').delete().eq('id', l.id)
@@ -128,7 +153,7 @@ export default function ProgrammeEditeur() {
       <div>
         <button className="linkbtn" onClick={() => nav(modele ? '/programmes' : '/')}>← {modele ? 'Mes programmes' : 'Mes athlètes'}</button>
         <h1 style={{ marginTop: 8 }}>{prog.nom}</h1>
-        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les programmes déjà attribués.' : `Programme de ${prog.athlete?.nom}`}</p>
+        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les programmes déjà attribués.' : `Programme de ${prog.athlete?.nom} : tes modifications lui sont visibles tout de suite.`}</p>
       </div>
 
       <div className="card">
@@ -152,6 +177,7 @@ export default function ProgrammeEditeur() {
             <span className="row">
               <button className="icon-btn" aria-label="Monter la séance" disabled={i === 0} onClick={() => deplacer(seances, i, -1, 'seances')}>↑</button>
               <button className="icon-btn" aria-label="Descendre la séance" disabled={i === seances.length - 1} onClick={() => deplacer(seances, i, 1, 'seances')}>↓</button>
+              <button className="linkbtn" onClick={() => copierSeance(s.id, s.nom)}>Dupliquer</button>
               <button className="linkbtn" onClick={() => supprimerSeance(s)}>Supprimer</button>
             </span>
           </div>
@@ -174,7 +200,8 @@ export default function ProgrammeEditeur() {
                       <Anim ex={exo[l.exercice_id]} cls="t" />
                       <div style={{ minWidth: 0 }}>
                         <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                          <strong>{exo[l.exercice_id].nom}</strong>
+                          <span style={{ minWidth: 0 }}><strong>{exo[l.exercice_id].nom}</strong><br />
+                            <button className="linkbtn" onClick={() => { setQ(''); setRemplace(l) }}>Changer d’exercice</button></span>
                           <span className="row" style={{ flexWrap: 'nowrap' }}>
                             <button className="icon-btn" aria-label="Monter" disabled={j === 0} onClick={() => deplacer(s.seance_exercices, j, -1, 'seance_exercices')}>↑</button>
                             <button className="icon-btn" aria-label="Descendre" disabled={j === s.seance_exercices.length - 1} onClick={() => deplacer(s.seance_exercices, j, 1, 'seance_exercices')}>↓</button>
@@ -204,6 +231,7 @@ export default function ProgrammeEditeur() {
 
       <div className="row">
         <button className="btn ghost" onClick={ajouterSeance}>+ Ajouter une séance</button>
+        <button className="btn ghost" onClick={ouvrirCopie}>Copier une séance d’un autre programme</button>
       </div>
 
       {modele && (
@@ -224,10 +252,35 @@ export default function ProgrammeEditeur() {
 
       <div className="row"><button className="linkbtn" onClick={supprimer}>Supprimer ce programme</button></div>
 
-      <dialog ref={dlg} onClose={() => { setAjoutDans(null); setCreation(false) }}>
-        {ajoutDans && (
+      <dialog ref={dlgCopie} onClose={() => setSources(null)}>
+        {sources && (
           <div className="dlg">
-            <div className="dlg-head"><h2>Ajouter à {ajoutDans.nom}</h2>
+            <div className="dlg-head"><h2>Copier une séance</h2>
+              <button className="icon-btn" aria-label="Fermer" onClick={() => dlgCopie.current.close()}>×</button></div>
+            <p className="sub" style={{ margin: 0 }}>La séance est ajoutée à la fin de ce programme avec ses exercices, ses notes et ses supersets.</p>
+            {sources.length === 0 ? <p className="empty">Aucune autre séance à copier.</p> : (
+              <div className="pick-list">
+                {sources.map((p) => (
+                  <div key={p.id} className="copie-prog">
+                    <span className="label">{p.nom}{p.athlete ? ` · ${p.athlete.nom}` : ' · modèle'}</span>
+                    {[...p.seances].sort((a, b) => a.ordre - b.ordre).map((x) => (
+                      <button key={x.id} className="pick pick-aliment" onClick={() => copierSeance(x.id, x.nom)}>
+                        <span><strong>{x.nom}</strong><br /><small className="sub">{x.seance_exercices[0]?.count ?? 0} exercice(s)</small></span>
+                        <span className="pill acc">Copier</span>
+                      </button>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </dialog>
+
+      <dialog ref={dlg} onClose={() => { setAjoutDans(null); setRemplace(null); setCreation(false) }}>
+        {(ajoutDans || remplace) && (
+          <div className="dlg">
+            <div className="dlg-head"><h2>{remplace ? `Remplacer ${exo[remplace.exercice_id]?.nom}` : `Ajouter à ${ajoutDans.nom}`}</h2>
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
             {creation ? (
               <NouvelExercice nomInitial={q} coachId={profil.id} onAnnuler={() => setCreation(false)}
@@ -240,7 +293,7 @@ export default function ProgrammeEditeur() {
                 <button key={e.id} className="pick" onClick={() => ajouterExercice(e)}>
                   <Anim ex={e} cls="t" />
                   <span><strong>{e.nom}</strong>{e.cree_par && <span className="pill"> Perso</span>}<br /><small className="sub">{e.muscles.join(', ')} · {e.materiel}</small></span>
-                  <span className="pill acc">Ajouter</span>
+                  <span className="pill acc">{remplace ? 'Choisir' : 'Ajouter'}</span>
                 </button>
               ))}
             </div>

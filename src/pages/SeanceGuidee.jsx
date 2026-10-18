@@ -51,12 +51,21 @@ export default function SeanceGuidee() {
     return () => clearInterval(t)
   }, [actif?.repos])
 
+  // Le coach a pu modifier la séance pendant qu'elle était en cours : on ajuste les séries gardées
+  const incoherent = !!(s && actif && s.lignes.some((l) => actif.sets[l.id]?.length !== l.series))
+  useEffect(() => {
+    if (!incoherent) return
+    maj({ sets: Object.fromEntries(s.lignes.map((l) => [l.id, Array.from({ length: l.series }, (_, k) =>
+      actif.sets[l.id]?.[k] ?? { reps: l.reps, kg: Number(l.charge_kg), fait: false })])) })
+  }, [incoherent])
+
   function maj(patch) {
     setRun((r) => { const n = { ...r, ...patch }; garderEnCours(n); return n })
   }
 
   if (s === null) return null
   if (!s) return <p className="empty">Séance introuvable.</p>
+  if (incoherent) return null
 
   const exDe = (l) => actif?.rempl[l.id] ?? l.exercice
   const precedent = (l, k) => derniers[exDe(l).id]?.[k]
