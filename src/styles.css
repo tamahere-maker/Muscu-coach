@@ -268,3 +268,13 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .regles-mdp .case{width:16px;height:16px;border:1.5px solid var(--line);border-radius:4px;display:inline-grid;place-items:center;font-size:11px;line-height:1;color:transparent;flex-shrink:0}
 .regles-mdp li.ok{color:var(--ok)}
 .regles-mdp li.ok .case{background:var(--ok);border-color:var(--ok);color:#fff}
+/* Messagerie : bulles, les miennes à droite */
+.conversation{gap:14px}
+.bulles{display:grid;gap:10px;max-height:60vh;overflow-y:auto;padding-right:4px}
+.bulle{max-width:85%;justify-self:start;background:var(--surface-2);border-radius:12px 12px 12px 4px;padding:8px 12px;display:grid;gap:2px}
+.bulle.moi{justify-self:end;background:var(--ink);color:var(--bg);border-radius:12px 12px 4px 12px}
+.bulle p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.bulle small{font-size:11px;opacity:.7}
+.bulle.moi .linkbtn{color:inherit;font-size:11px}
+.envoi{display:flex;gap:8px;align-items:flex-end}
+.envoi textarea{flex:1;min-width:0;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical}

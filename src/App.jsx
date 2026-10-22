@@ -22,6 +22,8 @@ import MesProgres from './pages/MesProgres'
 import BilanDetail from './pages/BilanDetail'
 import BilanFormulaire from './pages/BilanFormulaire'
 import MonCompte from './pages/MonCompte'
+import MesMessages from './pages/MesMessages'
+import { useNonLus } from './lib/Messages'
 import NouveauMotDePasse from './pages/NouveauMotDePasse'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
@@ -32,6 +34,7 @@ export default function App() {
   const { session, profil, recuperation } = useSession()
   const location = useLocation()
   const pret = !!profil
+  const nonLus = useNonLus()
   useEffect(() => { if (pret && MESSAGE_LIEN) toast(MESSAGE_LIEN) }, [pret])
   if (session === undefined) return null
   const choixMdp = session && recuperation
@@ -44,7 +47,10 @@ export default function App() {
           <span className="spacer" />
           {profil && !choixMdp && (profil.role === 'coach'
             ? <Link className="who" to="/compte">{profil.nom || session.user.email} · Mon compte</Link>
-            : <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>)}
+            : <>
+              <Link className="who" to="/messages">Messages{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge">{nonLus[profil.id]}</span>}</Link>
+              <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>
+            </>)}
           {session && <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Déconnexion</button>}
         </div>
         {profil && !choixMdp && (
@@ -85,6 +91,7 @@ export default function App() {
               {profil.role === 'athlete' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
               {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
+              {profil.role === 'athlete' && <Route path="/messages" element={<MesMessages />} />}
               {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteSuivi />} />}
               {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
               <Route path="/bilans/:id" element={<BilanDetail />} />

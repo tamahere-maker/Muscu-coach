@@ -4,6 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
+import { useNonLus } from '../lib/Messages'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -15,6 +16,7 @@ export default function CoachAthletes() {
   const [prix, setPrix] = useState('')
   const [nouveau, setNouveau] = useState(null)
   const [err, setErr] = useState('')
+  const nonLus = useNonLus()
 
   async function charger() {
     const [c, i] = await Promise.all([
@@ -109,6 +111,7 @@ export default function CoachAthletes() {
                   </div>
                   <span className="row">
                     <Link className="btn sm" to={`/athletes/${s.athlete.id}${nouveaux > 0 ? '?vue=bilans' : ''}`}>Suivi{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
+                    <Link className="btn ghost sm" to={`/athletes/${s.athlete.id}?vue=messages`}>Messages{nonLus[s.athlete.id] > 0 && <span className="badge">{nonLus[s.athlete.id]}</span>}</Link>
                     {!s.principal && s.perimetre === 'Nutrition' ? null : prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
                     {!s.principal && s.perimetre === 'Entraînement' ? null : plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
