@@ -99,7 +99,7 @@ export default function CoachAthletes() {
               return (
                 <div key={s.id}>
                   <div className="athlete">
-                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">{s.perimetre}</span>}</strong>
+                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">Coach associé · {s.perimetre}</span>}</strong>
                     <span className="sub">
                       {[p.niveau, p.objectifs?.join(', '), p.seances_semaine && `${p.seances_semaine} séances/sem.`, p.duree_min && `${p.duree_min} min`]
                         .filter(Boolean).join(' · ') || 'Profil pas encore rempli'}
@@ -109,9 +109,9 @@ export default function CoachAthletes() {
                   </div>
                   <span className="row">
                     <Link className="btn sm" to={`/athletes/${s.athlete.id}${nouveaux > 0 ? '?vue=bilans' : ''}`}>Suivi{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
-                    {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
+                    {!s.principal && s.perimetre === 'Nutrition' ? null : prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
-                    {plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
+                    {!s.principal && s.perimetre === 'Entraînement' ? null : plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
                       : <Link className="linkbtn" to="/nutrition">Attribuer un plan</Link>}
                   </span>
                 </div>

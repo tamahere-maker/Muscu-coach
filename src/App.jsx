@@ -5,6 +5,7 @@ import { LIEN_EMAIL_PARTIEL, LIEN_TYPE, supabase } from './lib/supabase'
 import { Toast, toast } from './lib/ui'
 import Connexion from './pages/Connexion'
 import Invitation from './pages/Invitation'
+import InvitationCoach from './pages/InvitationCoach'
 import CoachAthletes from './pages/CoachAthletes'
 import AthleteEntrainement from './pages/AthleteEntrainement'
 import AthleteNutrition from './pages/AthleteNutrition'
@@ -68,6 +69,7 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/invitation/:token" element={<Invitation />} />
+          <Route path="/invitation-coach/:token" element={<InvitationCoach />} />
           {!session ? (
             <Route path="*" element={<Connexion />} />
           ) : choixMdp ? (
