@@ -42,6 +42,7 @@ export default function AthleteProfil() {
         <p className="sub">{coachs.length
           ? `Suivi par ${coachs.map((c) => c.coach?.nom + (c.principal ? ' (coach principal)' : '')).join(', ')}.`
           : 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'}</p>
+        <p className="sub"><Link className="linkbtn" to="/compte">Mon compte : e-mail et mot de passe</Link></p>
       </div>
 
       {envoyes.length > 0 && (
