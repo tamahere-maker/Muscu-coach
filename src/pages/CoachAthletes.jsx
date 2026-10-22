@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
 import { useNonLus } from '../lib/Messages'
+import TableauDeBord from '../lib/TableauDeBord'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -55,6 +56,8 @@ export default function CoachAthletes() {
         <h1>Mes athlètes</h1>
         <p className="sub">Invite un athlète avec son e-mail, puis envoie-lui le lien.</p>
       </div>
+
+      <TableauDeBord nonLus={nonLus} />
 
       <form className="card" onSubmit={inviter}>
         <h2>Inviter un athlète</h2>

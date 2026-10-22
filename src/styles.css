@@ -278,3 +278,6 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .bulle.moi .linkbtn{color:inherit;font-size:11px}
 .envoi{display:flex;gap:8px;align-items:flex-end}
 .envoi textarea{flex:1;min-width:0;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px;resize:vertical}
+/* Tableau de bord du coach : une pastille de couleur par type d'alerte */
+.alertes .point{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:8px;vertical-align:middle}
+.alertes .point.acc{background:var(--accent)} .alertes .point.warn{background:var(--warn)} .alertes .point.ok{background:var(--ok)}
