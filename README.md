@@ -51,6 +51,11 @@ Les migrations sont appliquées dans l'ordre sur le projet Supabase :
 2. `002_exercices.sql` : 730 exercices (source Free Exercise DB, domaine public), noms en français. Nécessite temporairement l'extension `http`.
 3. `003_aliments.sql` : 82 aliments, valeurs nutritionnelles indicatives
 4. `004_droits_fonctions.sql` : fonctions réservées aux utilisateurs connectés
+5. `005` à `013` : modèles, scan, bilans, suivi…
+6. `014_coachs_associes.sql` : coachs associés (périmètre, part du paiement)
+7. `015_messages.sql` : messagerie athlète ↔ coachs
+8. `016_tableau_de_bord.sql` : tableau de bord du coach
+9. `017_consignes_fr.sql` : consignes en français des 647 exercices qui n'en avaient pas
 
 Les animations d'exercices sont des planches d'images dans `public/sprites/`.
 
