@@ -57,7 +57,7 @@ Les migrations sont appliquées dans l'ordre sur le projet Supabase :
 8. `016_tableau_de_bord.sql` : tableau de bord du coach
 9. `017_consignes_fr.sql` : consignes en français des 647 exercices qui n'en avaient pas
 
-Les animations d'exercices sont des planches d'images dans `public/sprites/`.
+Les animations d'exercices sont des planches d'images dans `public/sprites/` (2 positions par exercice, utilisées pour les vignettes et hors ligne). En grand format, l'app affiche une vidéo fluide `public/anim/s{planche}-{ligne}.mp4` : les positions intermédiaires sont calculées par interpolation IA (RIFE) à partir des 2 photos, avec `scripts/animations/generer.py` (voir l'en-tête du script).
 
 ## Mise en ligne
 
