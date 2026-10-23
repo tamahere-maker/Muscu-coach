@@ -11,11 +11,28 @@ export function somme(liste) {
     { kcal: 0, proteines: 0, glucides: 0, lipides: 0 })
 }
 
-// « 2 œufs » pour un aliment qui se compte, « 150 g » sinon
-export function quantite(a, grammes) {
-  if (!a.unite_g) return `${fmt(grammes)} g`
-  const n = Number(grammes) / Number(a.unite_g)
-  return `${fmt(n, 1)} ${n > 1 ? a.unite_pluriel : a.unite_nom}`
+// Unités dans lesquelles on peut doser un aliment ; les quantités restent stockées en grammes.
+// La première est l'unité par défaut : l'unité propre de l'aliment s'il se compte (œuf, tranche…), sinon le gramme.
+export function unites(a) {
+  const l = []
+  if (a.unite_g) l.push({ code: 'u', nom: a.unite_nom, pluriel: a.unite_pluriel, g: Number(a.unite_g) })
+  l.push({ code: 'g', nom: 'g', pluriel: 'g', g: 1 })
+  if (a.densite) l.push({ code: 'ml', nom: 'ml', pluriel: 'ml', g: Number(a.densite) })
+  if (a.cas_g) l.push({ code: 'cas', nom: 'c. à soupe', pluriel: 'c. à soupe', g: Number(a.cas_g) })
+  if (a.cac_g) l.push({ code: 'cac', nom: 'c. à café', pluriel: 'c. à café', g: Number(a.cac_g) })
+  return l
+}
+// L'unité demandée si l'aliment la propose, sinon son unité par défaut
+export const unite = (a, code) => { const l = unites(a); return l.find((u) => u.code === code) ?? l[0] }
+// Valeur à afficher dans l'unité, et pas de saisie
+export const enUnite = (u, grammes) => u.code === 'g' || u.code === 'ml' ? Math.round(Number(grammes) / u.g) : Math.round((Number(grammes) / u.g) * 10) / 10
+export const pas = (u) => (u.code === 'g' ? 5 : u.code === 'ml' ? 10 : 0.5)
+
+// « 2 œufs », « 1,5 c. à soupe », « 150 g »
+export function quantite(a, grammes, code) {
+  const u = unite(a, code), n = enUnite(u, grammes)
+  if (u.code === 'g' || u.code === 'ml') return `${fmt(n)} ${u.nom}`
+  return `${fmt(n, 1)} ${n > 1 ? u.pluriel : u.nom}`
 }
 
 export const resume = (m) => `${fmt(m.kcal)} kcal · P ${fmt(m.proteines)} · G ${fmt(m.glucides)} · L ${fmt(m.lipides)}`
@@ -48,10 +65,12 @@ export function substituts(a, aliments, exclus = [], n = 5) {
 }
 
 // Quantité équivalente : autant du macronutriment dominant de l'aliment d'origine (ou autant de calories)
-export function equivalent(a, grammes, b) {
+export function equivalent(a, grammes, b, code) {
   const k = ['proteines', 'glucides', 'lipides'].sort((x, y) => a[y] * (y === 'lipides' ? 9 : 4) - a[x] * (x === 'lipides' ? 9 : 4))[0]
   let q = Number(b[k]) >= 2 ? (a[k] * grammes) / b[k] : (a.kcal * grammes) / b.kcal
   q = Math.min(q, grammes * 4)
-  if (b.unite_g) return Math.max(0.5, Math.round((q / b.unite_g) * 2) / 2) * b.unite_g
-  return Math.max(5, Math.round(q / 5) * 5)
+  const u = unite(b, code)
+  if (u.code === 'g') return Math.max(5, Math.round(q / 5) * 5)
+  if (u.code === 'ml') return Math.max(10, Math.round(q / u.g / 10) * 10) * u.g
+  return Math.max(0.5, Math.round((q / u.g) * 2) / 2) * u.g
 }

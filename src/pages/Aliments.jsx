@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import Scanner from '../lib/Scanner'
 import { chercherProduit, complet } from '../lib/openfoodfacts'
+import { unites } from '../lib/nutrition'
 
 const CAT_SCAN = 'Produits scannés'
 const MACROS = [['kcal', 'kcal'], ['proteines', 'Prot.'], ['glucides', 'Gluc.'], ['lipides', 'Lip.']]
@@ -55,7 +56,7 @@ export default function Aliments() {
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div>
           <h1>Aliments</h1>
-          <p className="sub">Valeurs pour 100 g, et par unité quand l’aliment se compte.</p>
+          <p className="sub">Valeurs pour 100 g. Quantités possibles en grammes, et selon l’aliment en ml, cuillères ou unités.</p>
         </div>
         <button className="btn" onClick={() => setScan({ etape: 'camera' })}>Scanner un article</button>
       </div>
@@ -65,14 +66,14 @@ export default function Aliments() {
           <h2>{cat}</h2>
           <div className="tablewrap">
             <table>
-              <thead><tr><th>Aliment</th><th className="n">kcal</th><th className="n">Prot.</th><th className="n">Gluc.</th><th className="n">Lip.</th><th>Unité</th></tr></thead>
+              <thead><tr><th>Aliment</th><th className="n">kcal</th><th className="n">Prot.</th><th className="n">Gluc.</th><th className="n">Lip.</th><th>Mesures</th></tr></thead>
               <tbody>
                 {liste.map((a) => (
                   <tr key={a.id}>
                     <td>{a.nom}{a.marque && <small className="sub"> · {a.marque}</small>}</td>
                     <td className="n">{fmt(a.kcal)}</td><td className="n">{fmt(a.proteines, 1)}</td>
                     <td className="n">{fmt(a.glucides, 1)}</td><td className="n">{fmt(a.lipides, 1)}</td>
-                    <td>{a.unite_nom ? `1 ${a.unite_nom} = ${fmt(a.unite_g)} g` : ''}</td>
+                    <td className="sub">{unites(a).filter((u) => u.code !== 'g').map((u) => u.code === 'ml' ? `100 ml = ${fmt(u.g * 100)} g` : `1 ${u.nom} = ${fmt(u.g, 1)} g`).join(' · ')}</td>
                   </tr>
                 ))}
               </tbody>

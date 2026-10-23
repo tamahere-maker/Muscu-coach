@@ -3,7 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
-import { macrosDe, manquePourMetabolisme, metabolisme, resume, somme } from '../lib/nutrition'
+import { macrosDe, manquePourMetabolisme, metabolisme, resume, somme, unites } from '../lib/nutrition'
+import Quantite from '../lib/Quantite'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const OBJECTIFS = [['kcal', 'Calories (kcal)'], ['proteines', 'Protéines (g)'], ['glucides', 'Glucides (g)'], ['lipides', 'Lipides (g)']]
@@ -26,7 +27,7 @@ export default function PlanEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite)), complements(id, nom, dose, moment)')
       .eq('id', id).single()
     if (!data) return
     setPlan(data)
@@ -35,7 +36,7 @@ export default function PlanEditeur() {
   }
   useEffect(() => { charger() }, [id])
   useEffect(() => {
-    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g').order('nom')
+    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
@@ -88,9 +89,6 @@ export default function PlanEditeur() {
     dlg.current.close()
     charger()
   }
-  // Quantité saisie en unités pour un aliment qui se compte, en grammes sinon
-  const versGrammes = (a, v) => (a.unite_g ? Number(v) * Number(a.unite_g) : Number(v))
-  const depuisGrammes = (a, g) => (a.unite_g ? Math.round((Number(g) / Number(a.unite_g)) * 10) / 10 : Number(g))
 
   async function ajouterComplement() {
     await supabase.from('complements').insert({ plan_id: id, nom: 'Nouveau complément' })
@@ -181,10 +179,7 @@ export default function PlanEditeur() {
                   <button className="icon-btn" aria-label={`Retirer ${a.nom}`} onClick={async () => { await supabase.from('repas_aliments').delete().eq('id', l.id); charger() }}>×</button>
                 </div>
                 <div className="row" style={{ flexWrap: 'nowrap' }}>
-                  <input type="number" min="0" step={a.unite_g ? 0.5 : 5} aria-label={`Quantité de ${a.nom}`} className="qte"
-                    defaultValue={depuisGrammes(a, l.grammes)} key={l.grammes}
-                    onBlur={(e) => e.target.value !== '' && versGrammes(a, e.target.value) !== Number(l.grammes) && maj('repas_aliments', l, { grammes: versGrammes(a, e.target.value) })} />
-                  <span className="sub">{a.unite_g ? a.unite_pluriel : 'g'}</span>
+                  <Quantite aliment={a} grammes={l.grammes} code={l.unite} onChange={(champs) => maj('repas_aliments', l, champs)} />
                   <span className="sub macros-ligne">{resume(macrosDe(a, l.grammes))}</span>
                 </div>
                 <div className="chips">
@@ -250,7 +245,7 @@ export default function PlanEditeur() {
               {resultats.map((a) => (
                 <button key={a.id} className="pick pick-aliment" onClick={() => choisir(a)}>
                   <span><strong>{a.nom}</strong>{a.marque && <small className="sub"> · {a.marque}</small>}<br />
-                    <small className="sub">{a.categorie} · {resume(a)} pour 100 g{a.unite_g ? ` · 1 ${a.unite_nom} = ${fmt(a.unite_g)} g` : ''}</small></span>
+                    <small className="sub">{a.categorie} · {resume(a)} pour 100 g{unites(a).length > 1 ? ` · en ${unites(a).map((u) => u.nom).join(', ')}` : ''}</small></span>
                   <span className="pill acc">Ajouter</span>
                 </button>
               ))}
