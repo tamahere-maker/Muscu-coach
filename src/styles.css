@@ -281,3 +281,8 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 /* Tableau de bord du coach : une pastille de couleur par type d'alerte */
 .alertes .point{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--muted);margin-right:8px;vertical-align:middle}
 .alertes .point.acc{background:var(--accent)} .alertes .point.warn{background:var(--warn)} .alertes .point.ok{background:var(--ok)}
+
+/* --- Application installable : bandeaux sous l'en-tête --- */
+.bandeau{max-width:928px;margin:10px auto 0;padding:10px 14px;margin-inline:max(16px,calc((100% - 928px)/2));display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px}
+.bandeau > span{flex:1 1 220px}
+.bandeau.warn{border-left-color:var(--warn)}

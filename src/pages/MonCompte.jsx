@@ -3,6 +3,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
 import { ChampMdp, estSolide, traduire } from '../lib/motdepasse'
+import { CarteApplication } from '../lib/pwa'
 
 // Compte de connexion, commun au coach et à l'athlète : nom, adresse e-mail et mot de passe
 export default function MonCompte() {
@@ -88,6 +89,8 @@ export default function MonCompte() {
         {err.mdp && <p className="err">{err.mdp}</p>}
         <div className="row"><button className="btn" disabled={occupe}>Changer le mot de passe</button></div>
       </form>
+
+      <CarteApplication />
     </>
   )
 }
