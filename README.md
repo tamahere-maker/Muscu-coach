@@ -62,3 +62,11 @@ Les animations d'exercices sont des planches d'images dans `public/sprites/`.
 ## Mise en ligne
 
 `npm run deploy` (nécessite `wrangler login`). Ensuite, renseigner l'adresse du site dans Supabase (Authentication > URL Configuration) pour que les liens de confirmation d'e-mail pointent vers l'app.
+
+## Application installable (PWA)
+
+- `public/manifest.webmanifest` et `public/icons/` : nom, couleurs et icônes de l'app sur l'écran d'accueil.
+- `public/sw.js` : service worker. La coquille de l'app (page, JS, CSS) est gardée pour s'ouvrir sans réseau, et les animations d'exercices sont gardées après leur premier affichage. Les données Supabase ne sont jamais mises en cache.
+- Chaque build donne au service worker une nouvelle version (`vite.config.js`) : l'app affiche alors « Une nouvelle version de l'app est disponible » avec un bouton de mise à jour.
+- `public/_headers` : `sw.js` et le manifeste ne sont jamais gardés en cache par le navigateur, et les fichiers de `assets/` le sont pour un an.
+- Installation : bandeau « Installer » sous l'en-tête (Android, Chrome, Edge), consigne « Partager puis Sur l'écran d'accueil » sur iPhone, et rubrique « Application » dans Mon compte.

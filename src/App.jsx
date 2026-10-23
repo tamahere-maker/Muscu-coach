@@ -25,6 +25,7 @@ import MonCompte from './pages/MonCompte'
 import MesMessages from './pages/MesMessages'
 import { useNonLus } from './lib/Messages'
 import NouveauMotDePasse from './pages/NouveauMotDePasse'
+import { BandeauxPwa } from './lib/pwa'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
 const MESSAGE_LIEN = LIEN_EMAIL_PARTIEL ? 'Lien accepté. Ouvre aussi celui envoyé à ton autre adresse pour finir le changement.'
@@ -72,6 +73,7 @@ export default function App() {
           </nav>
         )}
       </header>
+      <BandeauxPwa connecte={!!profil && !choixMdp} />
       <main>
         <Routes>
           <Route path="/invitation/:token" element={<Invitation />} />

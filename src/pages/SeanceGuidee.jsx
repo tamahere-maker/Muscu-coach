@@ -168,14 +168,19 @@ export default function SeanceGuidee() {
     if (!lignesFaites.length) { toast('Valide au moins une série avant de terminer.'); return }
     setEnvoi(true)
     const { data: sr, error } = await supabase.from('seances_realisees').insert({ athlete_id: profil.id, seance_id: s.id, nom: s.nom }).select('id').single()
-    if (error) { setEnvoi(false); toast(error.message); return }
+    const horsLigne = 'Pas de réseau : ta séance reste gardée sur cet appareil, réessaie dès que tu as du réseau.'
+    if (error) { setEnvoi(false); toast(navigator.onLine ? error.message : horsLigne); return }
     const lignes = lignesFaites.map(({ li, z }, ordre) => {
       const x = exDe(li)
       return { seance_realisee_id: sr.id, exercice_id: x.id, exercice_prevu_id: x.id === li.exercice.id ? null : li.exercice.id, ordre, reps: Number(z.reps) || 0, charge_kg: Number(z.kg) || 0 }
     })
     const { error: e2 } = await supabase.from('series_realisees').insert(lignes)
+    if (e2) {
+      // Séance retirée pour éviter un doublon quand l'athlète réessaiera
+      await supabase.from('seances_realisees').delete().eq('id', sr.id)
+      setEnvoi(false); toast(navigator.onLine ? e2.message : horsLigne); return
+    }
     setEnvoi(false)
-    if (e2) { toast(e2.message); return }
     garderEnCours(null); setRun(null)
     toast(`Séance enregistrée · ${pluriel(lignes.length, 'série')}`)
     nav('/')
