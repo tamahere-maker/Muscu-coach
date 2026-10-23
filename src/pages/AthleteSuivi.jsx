@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase'
 import Progres from '../lib/Progres'
 import AthleteBilans from './AthleteBilans'
 import AthleteNutrition from './AthleteNutrition'
+import AthleteCoachs from './AthleteCoachs'
+import Conversation from '../lib/Messages'
 
-const VUES = [['seances', 'Séances'], ['nutrition', 'Nutrition'], ['bilans', 'Bilans']]
+const VUES = [['seances', 'Séances'], ['nutrition', 'Nutrition'], ['bilans', 'Bilans'], ['messages', 'Messages'], ['coachs', 'Coachs']]
 
 // Suivi d'un athlète par son coach : séances faites et statistiques, repas confirmés, bilans
 export default function AthleteSuivi() {
@@ -18,7 +20,7 @@ export default function AthleteSuivi() {
   useEffect(() => {
     supabase.from('profiles').select('id, nom, athlete_profiles(seances_semaine)').eq('id', id).single().then(({ data }) => setAthlete(data))
     Promise.all([
-      supabase.from('programmes').select('id, nom').eq('athlete_id', id).eq('actif', true).maybeSingle(),
+      supabase.from('programmes').select('id, nom, prix_eur').eq('athlete_id', id).eq('actif', true).maybeSingle(),
       supabase.from('plans_nutrition').select('id, nom').eq('athlete_id', id).eq('actif', true).maybeSingle(),
     ]).then(([p, n]) => setActifs({ prog: p.data, plan: n.data }))
   }, [id])
@@ -40,6 +42,8 @@ export default function AthleteSuivi() {
       {vue === 'seances' && <Progres athleteId={id} objectifSemaine={ap?.seances_semaine} />}
       {vue === 'nutrition' && <AthleteNutrition athleteId={id} lecture />}
       {vue === 'bilans' && <AthleteBilans id={id} />}
+      {vue === 'messages' && <Conversation athleteId={id} />}
+      {vue === 'coachs' && <AthleteCoachs id={id} prix={actifs.prog?.prix_eur} />}
     </>
   )
 }

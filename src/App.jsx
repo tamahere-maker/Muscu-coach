@@ -1,9 +1,11 @@
+import { useEffect } from 'react'
 import { Link, NavLink, useLocation, Navigate, Route, Routes } from 'react-router-dom'
 import { useSession } from './lib/session'
-import { supabase } from './lib/supabase'
-import { Toast } from './lib/ui'
+import { LIEN_EMAIL_PARTIEL, LIEN_TYPE, supabase } from './lib/supabase'
+import { Toast, toast } from './lib/ui'
 import Connexion from './pages/Connexion'
 import Invitation from './pages/Invitation'
+import InvitationCoach from './pages/InvitationCoach'
 import CoachAthletes from './pages/CoachAthletes'
 import AthleteEntrainement from './pages/AthleteEntrainement'
 import AthleteNutrition from './pages/AthleteNutrition'
@@ -19,11 +21,23 @@ import AthleteSuivi from './pages/AthleteSuivi'
 import MesProgres from './pages/MesProgres'
 import BilanDetail from './pages/BilanDetail'
 import BilanFormulaire from './pages/BilanFormulaire'
+import MonCompte from './pages/MonCompte'
+import MesMessages from './pages/MesMessages'
+import { useNonLus } from './lib/Messages'
+import NouveauMotDePasse from './pages/NouveauMotDePasse'
+
+// Message affiché à l'arrivée depuis un lien reçu par e-mail
+const MESSAGE_LIEN = LIEN_EMAIL_PARTIEL ? 'Lien accepté. Ouvre aussi celui envoyé à ton autre adresse pour finir le changement.'
+  : { signup: 'Adresse e-mail confirmée, bienvenue !', email_change: 'Nouvelle adresse e-mail confirmée' }[LIEN_TYPE]
 
 export default function App() {
-  const { session, profil } = useSession()
+  const { session, profil, recuperation } = useSession()
   const location = useLocation()
+  const pret = !!profil
+  const nonLus = useNonLus()
+  useEffect(() => { if (pret && MESSAGE_LIEN) toast(MESSAGE_LIEN) }, [pret])
   if (session === undefined) return null
+  const choixMdp = session && recuperation
 
   return (
     <>
@@ -31,12 +45,15 @@ export default function App() {
         <div className="top-in">
           <div className="brand">Muscu <b>Coach</b></div>
           <span className="spacer" />
-          {profil && (profil.role === 'coach'
-            ? <span className="who">{profil.nom || session.user.email} · Coach</span>
-            : <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>)}
+          {profil && !choixMdp && (profil.role === 'coach'
+            ? <Link className="who" to="/compte">{profil.nom || session.user.email} · Mon compte</Link>
+            : <>
+              <Link className="who" to="/messages">Messages{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge">{nonLus[profil.id]}</span>}</Link>
+              <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>
+            </>)}
           {session && <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Déconnexion</button>}
         </div>
-        {profil && (
+        {profil && !choixMdp && (
           <nav className="tabs">
             {profil.role === 'coach' ? (
               <>
@@ -58,8 +75,11 @@ export default function App() {
       <main>
         <Routes>
           <Route path="/invitation/:token" element={<Invitation />} />
+          <Route path="/invitation-coach/:token" element={<InvitationCoach />} />
           {!session ? (
             <Route path="*" element={<Connexion />} />
+          ) : choixMdp ? (
+            <Route path="*" element={<NouveauMotDePasse />} />
           ) : !profil ? (
             <Route path="*" element={null} />
           ) : (
@@ -71,9 +91,11 @@ export default function App() {
               {profil.role === 'athlete' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
               {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
+              {profil.role === 'athlete' && <Route path="/messages" element={<MesMessages />} />}
               {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteSuivi />} />}
               {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
               <Route path="/bilans/:id" element={<BilanDetail />} />
+              <Route path="/compte" element={<MonCompte />} />
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
               {profil.role === 'coach' && <Route path="/exercices" element={<Exercices />} />}
               {profil.role === 'coach' && <Route path="/aliments" element={<Aliments />} />}

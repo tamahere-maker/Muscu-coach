@@ -1,0 +1,30 @@
+<!-- Sujet : Ton adresse e-mail a été modifiée · Muscu Coach (notification de sécurité) -->
+<!DOCTYPE html>
+<html lang="fr">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Adresse e-mail modifiée</title></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#16191f;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#ffffff;border:1px solid #d6d9df;border-radius:12px;">
+        <tr><td style="padding:28px 28px 0;font-family:'Arial Narrow',Arial,sans-serif;font-size:24px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
+          Muscu <span style="color:#d6402b;">Coach</span>
+        </td></tr>
+        <tr><td style="padding:20px 28px 0;">
+          <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;">Adresse e-mail modifiée</h1>
+          <p style="margin:0 0 12px;font-size:15px;line-height:1.5;">L’adresse de ton compte Muscu Coach est passée de {{ .OldEmail }} à {{ .Email }}.</p>
+        </td></tr>
+        <tr><td style="padding:8px 28px 24px;">
+          <a href="{{ .SiteURL }}" style="display:inline-block;background:#d6402b;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 24px;border-radius:8px;">Ouvrir Muscu Coach</a>
+        </td></tr>
+        <tr><td style="padding:0 28px 24px;font-size:13px;line-height:1.5;color:#5b6270;">
+          Si le bouton ne fonctionne pas, copie ce lien dans ton navigateur :<br>
+          <a href="{{ .SiteURL }}" style="color:#d6402b;word-break:break-all;">{{ .SiteURL }}</a>
+        </td></tr>
+        <tr><td style="padding:16px 28px 24px;border-top:1px solid #d6d9df;font-size:12px;line-height:1.5;color:#5b6270;">
+          Ce n’était pas toi ? Contacte ton coach et utilise « Mot de passe oublié ? » avec ton ancienne adresse pour reprendre la main sur ton compte.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

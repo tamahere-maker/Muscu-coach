@@ -4,6 +4,8 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
+import { useNonLus } from '../lib/Messages'
+import TableauDeBord from '../lib/TableauDeBord'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -15,6 +17,7 @@ export default function CoachAthletes() {
   const [prix, setPrix] = useState('')
   const [nouveau, setNouveau] = useState(null)
   const [err, setErr] = useState('')
+  const nonLus = useNonLus()
 
   async function charger() {
     const [c, i] = await Promise.all([
@@ -53,6 +56,8 @@ export default function CoachAthletes() {
         <h1>Mes athlètes</h1>
         <p className="sub">Invite un athlète avec son e-mail, puis envoie-lui le lien.</p>
       </div>
+
+      <TableauDeBord nonLus={nonLus} />
 
       <form className="card" onSubmit={inviter}>
         <h2>Inviter un athlète</h2>
@@ -99,7 +104,7 @@ export default function CoachAthletes() {
               return (
                 <div key={s.id}>
                   <div className="athlete">
-                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">{s.perimetre}</span>}</strong>
+                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">Coach associé · {s.perimetre}</span>}</strong>
                     <span className="sub">
                       {[p.niveau, p.objectifs?.join(', '), p.seances_semaine && `${p.seances_semaine} séances/sem.`, p.duree_min && `${p.duree_min} min`]
                         .filter(Boolean).join(' · ') || 'Profil pas encore rempli'}
@@ -109,9 +114,10 @@ export default function CoachAthletes() {
                   </div>
                   <span className="row">
                     <Link className="btn sm" to={`/athletes/${s.athlete.id}${nouveaux > 0 ? '?vue=bilans' : ''}`}>Suivi{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
-                    {prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
+                    <Link className="btn ghost sm" to={`/athletes/${s.athlete.id}?vue=messages`}>Messages{nonLus[s.athlete.id] > 0 && <span className="badge">{nonLus[s.athlete.id]}</span>}</Link>
+                    {!s.principal && s.perimetre === 'Nutrition' ? null : prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
-                    {plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
+                    {!s.principal && s.perimetre === 'Entraînement' ? null : plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
                       : <Link className="linkbtn" to="/nutrition">Attribuer un plan</Link>}
                   </span>
                 </div>
