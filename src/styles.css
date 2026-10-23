@@ -55,7 +55,7 @@ button.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-co
 .btn.sm{padding:5px 10px;font-size:13px}
 .icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:32px;display:inline-grid;place-items:center;font-weight:700}
 .num{font-variant-numeric:tabular-nums}
-input[type=text],input[type=number],input[type=search],select.inp{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%;min-width:0}
+input[type=text],input[type=number],input[type=search],select.inp,select.unite{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%;min-width:0}
 input[type=number]{width:72px}
 .field{display:grid;gap:4px}
 .ex{display:grid;grid-template-columns:72px 1fr;gap:12px;align-items:start;padding-block:12px;border-top:1px solid var(--line)}
@@ -234,7 +234,10 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .note-coach{display:grid;gap:4px;border-left:4px solid var(--accent);background:var(--surface-2);border-radius:8px;padding:10px 12px}
 .card.note-coach{border-left:4px solid var(--accent)}
 .setlist div{cursor:pointer}
-.food .qte{width:70px}
+.food .qte{width:60px}
+.food select.unite{max-width:96px}
+.qte-unite{gap:4px;flex-wrap:nowrap}
+select.unite{width:auto;max-width:130px;padding:7px 6px}
 @media (max-width:480px){.setcard .stepper{grid-template-columns:36px minmax(0,1fr) 36px;gap:4px}.setcard .stepper input{font-size:18px;padding:8px 0}.setcard .stepper button{height:40px}}
 /* Statistiques et historique */
 .barres{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;align-items:end;height:150px}

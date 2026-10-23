@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, jourIso, toast } from '../lib/ui'
-import { equivalent, macrosDe, quantite, resume, somme, substituts } from '../lib/nutrition'
+import { equivalent, macrosDe, quantite, resume, somme, substituts, unite } from '../lib/nutrition'
+import Quantite from '../lib/Quantite'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const decaler = (iso, n) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() + n); return jourIso(d) }
@@ -16,7 +17,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const [plan, setPlan] = useState(undefined)
   const [aliments, setAliments] = useState([])
   const [jour, setJour] = useState(jourIso())
-  const [journal, setJournal] = useState(null) // repas_aliment_id → { aliment_id, grammes, confirme }
+  const [journal, setJournal] = useState(null) // repas_aliment_id → { aliment_id, grammes, unite, confirme }
   const [prises, setPrises] = useState(null) // complement_id → true
   const [choix, setChoix] = useState(null) // ligne du plan dont on change l'aliment
   const [q, setQ] = useState('')
@@ -25,15 +26,15 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
 
   useEffect(() => {
     supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite)), complements(id, nom, dose, moment)')
       .eq('athlete_id', aid).eq('actif', true).maybeSingle().then(({ data }) => setPlan(data))
-    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g').order('nom')
+    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
   }, [aid])
 
   useEffect(() => {
     setJournal(null); setPrises(null)
-    supabase.from('journal_aliments').select('repas_aliment_id, aliment_id, grammes, confirme').eq('athlete_id', aid).eq('date', jour)
+    supabase.from('journal_aliments').select('repas_aliment_id, aliment_id, grammes, unite, confirme').eq('athlete_id', aid).eq('date', jour)
       .then(({ data }) => setJournal(Object.fromEntries((data ?? []).map((j) => [j.repas_aliment_id, j]))))
     supabase.from('prises_complements').select('complement_id').eq('athlete_id', aid).eq('date', jour)
       .then(({ data }) => setPrises(Object.fromEntries((data ?? []).map((p) => [p.complement_id, true]))))
@@ -64,7 +65,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const entree = (l, jr = journal) => {
     const j = jr[l.id]
     const aliment = alim[j?.aliment_id ?? l.aliment_id]
-    return { aliment, grammes: Number(j?.grammes ?? l.grammes), ok: !!j?.confirme, change: j?.aliment_id != null && j.aliment_id !== l.aliment_id, prevu: alim[l.aliment_id] }
+    return { aliment, grammes: Number(j?.grammes ?? l.grammes), code: j?.unite ?? l.unite, ok: !!j?.confirme, change: j?.aliment_id != null && j.aliment_id !== l.aliment_id, prevu: alim[l.aliment_id] }
   }
   const toutes = repas.flatMap((r) => r.lignes)
   const mange = somme(toutes.map((l) => entree(l)).filter((x) => x.ok && x.aliment).map((x) => macrosDe(x.aliment, x.grammes)))
@@ -79,26 +80,22 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   async function ecrire(lignes) {
     const avant = journal
     const rows = lignes.map(({ l, patch }) => {
-      const j = journal[l.id] ?? { aliment_id: null, grammes: null, confirme: false }
-      return { athlete_id: aid, date: jour, repas_aliment_id: l.id, aliment_id: j.aliment_id, grammes: j.grammes, confirme: j.confirme, ...patch }
+      const j = journal[l.id] ?? { aliment_id: null, grammes: null, unite: null, confirme: false }
+      return { athlete_id: aid, date: jour, repas_aliment_id: l.id, aliment_id: j.aliment_id, grammes: j.grammes, unite: j.unite ?? null, confirme: j.confirme, ...patch }
     })
     setJournal((x) => ({ ...x, ...Object.fromEntries(rows.map((r) => [r.repas_aliment_id, r])) }))
     const { error } = await supabase.from('journal_aliments').upsert(rows)
     if (error) { setJournal(avant); toast(error.message) }
   }
 
-  function changerQuantite(l, v) {
-    const e = entree(l)
-    const g = e.aliment.unite_g ? Number(v) * Number(e.aliment.unite_g) : Number(v)
-    if (!(g > 0) || g === e.grammes) return
-    ecrire([{ l, patch: { grammes: g, confirme: true } }])
-  }
+  // Nouvelle quantité : comptée comme mangée ; nouvelle unité : seulement l'affichage
+  const changerQuantite = (l, champs) => ecrire([{ l, patch: champs.grammes ? { grammes: champs.grammes, confirme: true } : champs }])
 
   function ouvrir(l) { setChoix(l); setQ(''); dlg.current.showModal() }
   function choisir(a) {
     const l = choix, prevu = alim[l.aliment_id]
-    const patch = a.id === l.aliment_id ? { aliment_id: null, grammes: null, confirme: true }
-      : { aliment_id: a.id, grammes: equivalent(prevu, Number(l.grammes), a), confirme: true }
+    const patch = a.id === l.aliment_id ? { aliment_id: null, grammes: null, unite: null, confirme: true }
+      : { aliment_id: a.id, grammes: equivalent(prevu, Number(l.grammes), a, l.unite), unite: null, confirme: true }
     ecrire([{ l, patch }])
     dlg.current.close()
     toast(a.id === l.aliment_id ? `${prevu.nom} rétabli` : `${prevu.nom} remplacé par ${a.nom}`)
@@ -130,7 +127,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const option = (a, etiquette) => (
     <button key={a.id} className="pick pick-aliment" onClick={() => choisir(a)}>
       <span><strong>{a.nom}</strong>{a.marque && <small className="sub"> · {a.marque}</small>}<br />
-        <small className="sub">{quantite(a, equivalent(prevuChoix, Number(ligne.grammes), a))} · {resume(macrosDe(a, equivalent(prevuChoix, Number(ligne.grammes), a)))}</small></span>
+        <small className="sub">{quantite(a, equivalent(prevuChoix, Number(ligne.grammes), a, ligne.unite), ligne.unite)} · {resume(macrosDe(a, equivalent(prevuChoix, Number(ligne.grammes), a, ligne.unite)))}</small></span>
       <span className="pill acc">{etiquette}</span>
     </button>
   )
@@ -194,19 +191,15 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
             </div>
             {r.note && <p className="consigne">{r.note}</p>}
             <div>
-              {es.map(({ l, aliment, grammes, ok, change, prevu }) => aliment && (
+              {es.map(({ l, aliment, grammes, code, ok, change, prevu }) => aliment && (
                 <div key={l.id} className="food">
                   <div className="nm">
                     <strong>{aliment.nom}</strong>{change && <span className="swapped"> remplace {prevu?.nom}</span>}
-                    <small>{aliment.unite_g ? `${fmt(grammes)} g · ` : ''}{resume(macrosDe(aliment, grammes))}</small>
+                    <small>{unite(aliment, code).code !== 'g' ? `${fmt(grammes)} g · ` : ''}{resume(macrosDe(aliment, grammes))}</small>
                     {!lecture && <button className="linkbtn" onClick={() => ouvrir(l)}>Changer</button>}
                   </div>
-                  {lecture ? <span className="num">{quantite(aliment, grammes)}</span> : <span className="row" style={{ gap: 4, flexWrap: 'nowrap' }}>
-                    <input key={`${jour}-${aliment.id}-${grammes}`} type="number" min="0" step={aliment.unite_g ? 0.5 : 5} className="qte"
-                      aria-label={`Quantité de ${aliment.nom}`} defaultValue={aliment.unite_g ? Math.round((grammes / aliment.unite_g) * 10) / 10 : grammes}
-                      onBlur={(x) => changerQuantite(l, x.target.value)} onKeyDown={(x) => x.key === 'Enter' && x.target.blur()} />
-                    <span className="sub">{aliment.unite_g ? aliment.unite_pluriel : 'g'}</span>
-                  </span>}
+                  {lecture ? <span className="num">{quantite(aliment, grammes, code)}</span>
+                    : <Quantite key={jour} aliment={aliment} grammes={grammes} code={code} onChange={(champs) => changerQuantite(l, champs)} />}
                   <button className="done" disabled={lecture} aria-pressed={ok} aria-label={`Confirmer ${aliment.nom}`} onClick={() => ecrire([{ l, patch: { confirme: !ok } }])}>✓</button>
                 </div>
               ))}
@@ -222,11 +215,11 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
           <div className="dlg">
             <div className="dlg-head"><h2>Remplacer {prevuChoix.nom}</h2>
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
-            <p className="sub" style={{ margin: 0 }}>Prévu : {quantite(prevuChoix, ligne.grammes)}. Les quantités proposées apportent l’équivalent.</p>
+            <p className="sub" style={{ margin: 0 }}>Prévu : {quantite(prevuChoix, ligne.grammes, ligne.unite)}. Les quantités proposées apportent l’équivalent.</p>
             <div className="pick-list">
               {actuel.change && (
                 <button className="pick pick-aliment" onClick={() => choisir(prevuChoix)}>
-                  <span><strong>{prevuChoix.nom}</strong><br /><small className="sub">{quantite(prevuChoix, ligne.grammes)} · aliment prévu par ton coach</small></span>
+                  <span><strong>{prevuChoix.nom}</strong><br /><small className="sub">{quantite(prevuChoix, ligne.grammes, ligne.unite)} · aliment prévu par ton coach</small></span>
                   <span className="pill">Revenir</span>
                 </button>
               )}
