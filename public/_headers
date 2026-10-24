@@ -5,6 +5,3 @@
   Cache-Control: no-cache
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
-# Animations d'exercices : fichiers fixes, gardés une semaine par le navigateur
-/anim/*
-  Cache-Control: public, max-age=604800
