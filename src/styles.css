@@ -117,8 +117,10 @@ svg text{fill:var(--muted);font-size:11px;font-family:var(--body)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* --- v2 : animations d'exercices (planches de sprites), séance guidée, journal alimentaire --- */
-.anim{display:block;background-color:#fff;background-repeat:no-repeat;border-radius:6px;animation:flip 1.6s infinite;aspect-ratio:3/2;max-width:100%}
-@keyframes flip{0%,49.9%{background-position-x:0%}50%,100%{background-position-x:100%}}
+.anim{display:block;position:relative;background-color:#fff;background-repeat:no-repeat;background-position-x:0%;border-radius:6px;aspect-ratio:3/2;max-width:100%}
+/* Seconde position par-dessus la première, en fondu enchaîné (pause à chaque extrémité) */
+.anim::after{content:'';position:absolute;inset:0;border-radius:inherit;background:inherit;background-position-x:100%;opacity:0;animation:fondu 2.4s ease-in-out infinite}
+@keyframes fondu{0%,30%{opacity:0}50%,80%{opacity:1}100%{opacity:0}}
 .anim.t{width:72px}
 .anim.s{width:48px}
 .anim.big{width:100%;border-radius:10px}
@@ -203,6 +205,7 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .repas-ath .ligne{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:4px 0}
 @media (max-width:480px){nav.tabs{gap:0}nav.tabs a{flex:1 1 auto;text-align:center;padding:10px 4px;font-size:13px}}
 @media (max-width:640px){nav.tabs a{border-bottom:0;border-top:3px solid transparent;padding-block:12px}nav.tabs a.active{border-top-color:var(--accent)}}
+.anim.perso::after{content:none}
 .anim.perso{display:grid;place-items:center;background:var(--surface-2);background-image:none;animation:none;color:var(--accent);font-family:var(--display);font-weight:800;font-size:22px}
 .anim.perso.big{font-size:64px}
 .lib-item .anim.perso{font-size:40px}
