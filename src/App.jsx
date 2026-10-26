@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
-import { Link, NavLink, useLocation, Navigate, Route, Routes } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate, Navigate, Route, Routes } from 'react-router-dom'
 import { useSession } from './lib/session'
-import { LIEN_EMAIL_PARTIEL, LIEN_TYPE, supabase } from './lib/supabase'
+import { LIEN_EMAIL_PARTIEL, LIEN_TYPE } from './lib/supabase'
 import { Toast, toast } from './lib/ui'
 import Connexion from './pages/Connexion'
 import Invitation from './pages/Invitation'
@@ -23,6 +23,8 @@ import BilanDetail from './pages/BilanDetail'
 import BilanFormulaire from './pages/BilanFormulaire'
 import MonCompte from './pages/MonCompte'
 import MesMessages from './pages/MesMessages'
+import CoachMessages from './pages/CoachMessages'
+import { deconnexion, rafraichirPush } from './lib/push'
 import { useNonLus } from './lib/Messages'
 import NouveauMotDePasse from './pages/NouveauMotDePasse'
 import { BandeauxPwa } from './lib/pwa'
@@ -36,7 +38,17 @@ export default function App() {
   const location = useLocation()
   const pret = !!profil
   const nonLus = useNonLus()
+  const nav = useNavigate()
   useEffect(() => { if (pret && MESSAGE_LIEN) toast(MESSAGE_LIEN) }, [pret])
+  // Notifications : l'appareil reste rattaché au compte connecté ; toucher une notification ouvre la conversation
+  useEffect(() => { if (pret) rafraichirPush().catch(() => {}) }, [profil?.id])
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const surMessage = (e) => { if (e.data?.aller) nav(e.data.aller) }
+    navigator.serviceWorker.addEventListener('message', surMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', surMessage)
+  }, [])
+  const totalNonLus = Object.values(nonLus).reduce((t, n) => t + n, 0)
   if (session === undefined) return null
   const choixMdp = session && recuperation
 
@@ -52,7 +64,7 @@ export default function App() {
               <Link className="who" to="/messages">Messages{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge">{nonLus[profil.id]}</span>}</Link>
               <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>
             </>)}
-          {session && <button className="btn ghost sm" onClick={() => supabase.auth.signOut()}>Déconnexion</button>}
+          {session && <button className="btn ghost sm" onClick={deconnexion}>Déconnexion</button>}
         </div>
         {profil && !choixMdp && (
           <nav className="tabs">
@@ -63,6 +75,7 @@ export default function App() {
                 <NavLink to="/nutrition">Nutrition</NavLink>
                 <NavLink to="/exercices">Exercices</NavLink>
                 <NavLink to="/aliments">Aliments</NavLink>
+                <NavLink to="/messages">Messages{totalNonLus > 0 && !location.pathname.startsWith('/messages') && <span className="badge">{totalNonLus}</span>}</NavLink>
               </>
             ) : (
               <>
@@ -93,7 +106,8 @@ export default function App() {
               {profil.role === 'athlete' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
               {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
-              {profil.role === 'athlete' && <Route path="/messages" element={<MesMessages />} />}
+              <Route path="/messages" element={profil.role === 'coach' ? <CoachMessages /> : <MesMessages />} />
+              {profil.role === 'coach' && <Route path="/messages/:id" element={<CoachMessages />} />}
               {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteSuivi />} />}
               {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
               <Route path="/bilans/:id" element={<BilanDetail />} />

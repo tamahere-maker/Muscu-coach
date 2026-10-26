@@ -114,7 +114,7 @@ export default function CoachAthletes() {
                   </div>
                   <span className="row">
                     <Link className="btn sm" to={`/athletes/${s.athlete.id}${nouveaux > 0 ? '?vue=bilans' : ''}`}>Suivi{nouveaux > 0 && <span className="badge">{nouveaux}</span>}</Link>
-                    <Link className="btn ghost sm" to={`/athletes/${s.athlete.id}?vue=messages`}>Messages{nonLus[s.athlete.id] > 0 && <span className="badge">{nonLus[s.athlete.id]}</span>}</Link>
+                    <Link className="btn ghost sm" to={`/messages/${s.athlete.id}`}>Messages{nonLus[s.athlete.id] > 0 && <span className="badge">{nonLus[s.athlete.id]}</span>}</Link>
                     {!s.principal && s.perimetre === 'Nutrition' ? null : prog ? <Link className="btn ghost sm" to={`/programmes/${prog.id}`}>{prog.nom}</Link>
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
                     {!s.principal && s.perimetre === 'Entraînement' ? null : plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>

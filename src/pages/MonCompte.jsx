@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
 import { ChampMdp, estSolide, traduire } from '../lib/motdepasse'
 import { CarteApplication } from '../lib/pwa'
+import { CarteNotifications } from '../lib/Messages'
 
 // Compte de connexion, commun au coach et à l'athlète : nom, adresse e-mail et mot de passe
 export default function MonCompte() {
@@ -90,6 +91,7 @@ export default function MonCompte() {
         <div className="row"><button className="btn" disabled={occupe}>Changer le mot de passe</button></div>
       </form>
 
+      <CarteNotifications />
       <CarteApplication />
     </>
   )
