@@ -1,5 +1,5 @@
 import { useSession } from '../lib/session'
-import Conversation from '../lib/Messages'
+import Conversation, { BandeauNotifications } from '../lib/Messages'
 
 // Messagerie de l'athlète avec ses coachs
 export default function MesMessages() {
@@ -10,6 +10,7 @@ export default function MesMessages() {
         <h1>Messages</h1>
         <p className="sub">Ta conversation avec tes coachs.</p>
       </div>
+      <BandeauNotifications />
       <Conversation athleteId={profil.id} />
     </>
   )

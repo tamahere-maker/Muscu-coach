@@ -66,3 +66,30 @@ self.addEventListener('fetch', (e) => {
   // Polices Google
   if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') e.respondWith(depuisCache(MEDIAS, req))
 })
+
+// Notifications push des nouveaux messages (envoyées par la fonction Supabase « notifier »)
+self.addEventListener('push', (e) => {
+  let d = {}
+  try { d = e.data?.json() ?? {} } catch { d = { corps: e.data?.text() } }
+  e.waitUntil(self.registration.showNotification(d.titre || 'Muscu Coach', {
+    body: d.corps || 'Nouveau message',
+    icon: '/icons/icone-192.png',
+    badge: '/icons/icone-192.png',
+    tag: d.tag,
+    renotify: !!d.tag,
+    data: { url: d.url || '/messages' },
+  }))
+})
+
+// Toucher la notification ouvre la conversation, dans l'app déjà ouverte si possible
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close()
+  const chemin = e.notification.data?.url || '/messages'
+  e.waitUntil((async () => {
+    const fenetres = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+    const f = fenetres.find((c) => new URL(c.url).origin === self.location.origin)
+    // L'app ouverte change de page sans se recharger (écoute dans App.jsx)
+    if (f) { f.postMessage({ aller: chemin }); return f.focus() }
+    return self.clients.openWindow(chemin)
+  })())
+})

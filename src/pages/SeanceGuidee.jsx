@@ -4,6 +4,7 @@ import { etapes, garderEnCours, lireEnCours, remplacants } from '../lib/seance'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, fmt, toast } from '../lib/ui'
+import { EcrireAuCoach } from '../lib/Messages'
 
 const CHAMPS_EX = 'id, nom, sprite, consigne, lien_video, muscles, materiel, categorie, force, mecanique, niveau, essentiel'
 const chrono = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
@@ -230,6 +231,7 @@ export default function SeanceGuidee() {
           {l.note && <div className="note-coach"><span className="label">Note du coach</span><p style={{ margin: 0 }}>{l.note}</p></div>}
           {ex.consigne && <p style={{ margin: 0 }}>{ex.consigne}</p>}
           {ex.lien_video && <a className="linkbtn" href={ex.lien_video} target="_blank" rel="noreferrer">Voir la vidéo</a>}
+          <EcrireAuCoach exercice={ex} seanceId={s.id} />
         </div>
         <div className="card setcard">
           <div className="row" style={{ justifyContent: 'space-between' }}>

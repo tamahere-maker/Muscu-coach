@@ -16,7 +16,7 @@ export default function TableauDeBord({ nonLus }) {
   for (const a of lignes) {
     const lien = (vue) => `/athletes/${a.athlete_id}?vue=${vue}`
     const nm = a.nom || 'Sans nom'
-    if (nonLus[a.athlete_id]) alertes.push({ cle: a.athlete_id + 'm', lien: lien('messages'), ton: 'acc', texte: `${nm} : ${nonLus[a.athlete_id]} message${nonLus[a.athlete_id] > 1 ? 's' : ''} non lu${nonLus[a.athlete_id] > 1 ? 's' : ''}` })
+    if (nonLus[a.athlete_id]) alertes.push({ cle: a.athlete_id + 'm', lien: `/messages/${a.athlete_id}`, ton: 'acc', texte: `${nm} : ${nonLus[a.athlete_id]} message${nonLus[a.athlete_id] > 1 ? 's' : ''} non lu${nonLus[a.athlete_id] > 1 ? 's' : ''}` })
     if (a.bilans_a_lire > 0) alertes.push({ cle: a.athlete_id + 'b', lien: lien('bilans'), ton: 'acc', texte: `${nm} : ${a.bilans_a_lire} bilan${a.bilans_a_lire > 1 ? 's' : ''} à lire` })
     if (a.bilan_en_retard) alertes.push({ cle: a.athlete_id + 'r', lien: lien('bilans'), ton: 'warn', texte: `${nm} : bilan hebdomadaire en retard` })
     if (!a.derniere_seance) alertes.push({ cle: a.athlete_id + 'i', lien: lien('seances'), ton: 'warn', texte: `${nm} : aucune séance enregistrée` })
