@@ -45,6 +45,9 @@ export async function televerserPiece(athleteId, fichier) {
   return { piece_chemin: chemin, piece_type: video ? 'video' : 'image' }
 }
 
+// Chaque abonnement en direct a son propre canal : deux canaux du même nom se partagent et le second planterait
+let numCanal = 0
+
 // Messages non lus de l'utilisateur connecté, par athlète ({ [athlete_id]: n }), relus à chaque changement de page
 // et à chaque nouveau message
 export function useNonLus() {
@@ -58,7 +61,7 @@ export function useNonLus() {
   }, [session?.user.id, pathname, tic])
   useEffect(() => {
     if (!session) return
-    const canal = supabase.channel(`non-lus-${session.user.id}`)
+    const canal = supabase.channel(`non-lus-${session.user.id}-${++numCanal}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => setTic((x) => x + 1))
       .subscribe()
     return () => { supabase.removeChannel(canal) }
@@ -150,7 +153,7 @@ export default function Conversation({ athleteId }) {
   useEffect(() => {
     setMsgs(null)
     charger()
-    const canal = supabase.channel(`messages-${athleteId}`)
+    const canal = supabase.channel(`messages-${athleteId}-${++numCanal}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'messages', filter: `athlete_id=eq.${athleteId}` }, charger)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'lectures_messages', filter: `athlete_id=eq.${athleteId}` }, relireLectures)
       .subscribe()
