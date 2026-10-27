@@ -87,8 +87,8 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
     <form key={mode} className="card auth" onSubmit={valider} method="post" action="/" name={mode === 'connexion' ? 'connexion' : 'inscription'}>
       <h2>{titre}</h2>
       <div className="seg" role="group">
-        <button type="button" aria-pressed={mode === 'inscription'} onClick={() => changer('inscription')}>Créer un compte</button>
         <button type="button" aria-pressed={mode === 'connexion'} onClick={() => changer('connexion')}>Se connecter</button>
+        <button type="button" aria-pressed={mode === 'inscription'} onClick={() => changer('inscription')}>Créer un compte</button>
       </div>
       {mode === 'inscription' && (
         <label className="field"><span className="label">Nom</span>
