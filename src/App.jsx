@@ -61,7 +61,6 @@ export default function App() {
           {profil && !choixMdp && (profil.role === 'coach'
             ? <Link className="who" to="/compte">{profil.nom || session.user.email} · Mon compte</Link>
             : <>
-              <Link className="who" to="/messages">Messages{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge">{nonLus[profil.id]}</span>}</Link>
               <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>
             </>)}
           {session && <button className="btn ghost sm" onClick={deconnexion}>Déconnexion</button>}
@@ -80,6 +79,7 @@ export default function App() {
               <>
                 <NavLink to="/" className={({ isActive }) => (isActive || /^\/(seance|progres)/.test(location.pathname) ? 'active' : undefined)} end aria-label="Entraînement" title="Entraînement"><Icone nom="entrainement" /><span className="lbl">Entraînement</span></NavLink>
                 <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
+                <NavLink to="/messages" aria-label={nonLus[profil.id] > 0 ? `Messages, ${nonLus[profil.id]} non lus` : 'Messages'} title="Messages"><Icone nom="messages" /><span className="lbl">Messages</span>{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge" aria-hidden="true">{nonLus[profil.id]}</span>}</NavLink>
               </>
             )}
           </nav>
