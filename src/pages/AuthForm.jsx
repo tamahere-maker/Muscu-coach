@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { ChampMdp, estSolide, traduire } from '../lib/motdepasse'
+import { ChampMdp, estSolide, memoriserIdentifiants, traduire } from '../lib/motdepasse'
 
 // Connexion, création de compte et mot de passe oublié. `role` fixe le rôle du compte créé (coach depuis l'accueil, athlète depuis une invitation).
 export default function AuthForm({ role, retour = window.location.origin + '/', titre, modeInitial = 'inscription', erreurInitiale = '' }) {
@@ -39,7 +39,11 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
       setNonConfirme(/Email not confirmed/i.test(error.message))
       return setErr(traduire(error.message))
     }
-    if (mode === 'inscription' && !data.session) setEnvoye('confirmation')
+    if (mode === 'inscription' && !data.session) return setEnvoye('confirmation')
+    await memoriserIdentifiants(email, mdp, nom)
+    // Vraie navigation après la connexion : Safari / le trousseau iCloud propose alors d'enregistrer l'identifiant
+    // (la session est déjà gardée dans le navigateur, la page se recharge connectée)
+    window.location.replace(retour)
   }
 
   async function renvoyer() {
@@ -70,7 +74,8 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
       <h2>Mot de passe oublié</h2>
       <p className="sub" style={{ margin: 0 }}>Saisis l’adresse e-mail de ton compte : tu recevras un lien pour choisir un nouveau mot de passe.</p>
       <label className="field"><span className="label">E-mail</span>
-        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
+        <input required type="email" name="username" id="username" value={email} onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
       {err && <p className="err">{err}</p>}
       <button className="btn" disabled={occupe}>Envoyer le lien</button>
       <button type="button" className="linkbtn" onClick={() => changer('connexion')}>Retour à la connexion</button>
@@ -78,7 +83,8 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
   )
 
   return (
-    <form className="card auth" onSubmit={valider}>
+    // key : un formulaire distinct par mode, pour que le gestionnaire de mots de passe distingue connexion et création de compte
+    <form key={mode} className="card auth" onSubmit={valider} method="post" action="/" name={mode === 'connexion' ? 'connexion' : 'inscription'}>
       <h2>{titre}</h2>
       <div className="seg" role="group">
         <button type="button" aria-pressed={mode === 'inscription'} onClick={() => changer('inscription')}>Créer un compte</button>
@@ -86,16 +92,17 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
       </div>
       {mode === 'inscription' && (
         <label className="field"><span className="label">Nom</span>
-          <input required value={nom} onChange={(e) => setNom(e.target.value)} autoComplete="name" /></label>
+          <input required name="name" id="name" value={nom} onChange={(e) => setNom(e.target.value)} autoComplete="name" /></label>
       )}
       <label className="field"><span className="label">E-mail</span>
-        <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
+        <input required type="email" name="username" id="username" value={email} onChange={(e) => setEmail(e.target.value)}
+          autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
       <ChampMdp label="Mot de passe" valeur={mdp} onChange={setMdp} nouveau={mode === 'inscription'} regles={mode === 'inscription'} />
-      {mode === 'inscription' && <ChampMdp label="Confirmer le mot de passe" valeur={mdp2} onChange={setMdp2} nouveau />}
+      {mode === 'inscription' && <ChampMdp label="Confirmer le mot de passe" valeur={mdp2} onChange={setMdp2} nouveau name="confirm-password" />}
       {mode === 'connexion' && <button type="button" className="linkbtn" style={{ justifySelf: 'end' }} onClick={() => changer('oubli')}>Mot de passe oublié ?</button>}
       {err && <p className="err">{err}</p>}
       {nonConfirme && <button type="button" className="btn ghost" disabled={occupe} onClick={renvoyer}>Renvoyer l’e-mail de confirmation</button>}
-      <button className="btn" disabled={occupe}>{mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}</button>
+      <button type="submit" className="btn" disabled={occupe}>{mode === 'connexion' ? 'Se connecter' : 'Créer mon compte'}</button>
     </form>
   )
 }

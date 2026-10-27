@@ -20,18 +20,36 @@ export function ReglesMdp({ valeur }) {
 }
 
 // Champ mot de passe avec bouton Afficher / Masquer
-export function ChampMdp({ label, valeur, onChange, nouveau = false, regles = false }) {
+// `name` et `autoComplete` permettent au trousseau / gestionnaire de mots de passe de proposer l'enregistrement et le remplissage
+export function ChampMdp({ label, valeur, onChange, nouveau = false, regles = false, name }) {
   const [voir, setVoir] = useState(false)
+  const nomChamp = name || (nouveau ? 'new-password' : 'password')
   return (
     <label className="field"><span className="label">{label}</span>
       <span className="mdp">
         <input required type={voir ? 'text' : 'password'} value={valeur} onChange={(e) => onChange(e.target.value)}
-          autoComplete={nouveau ? 'new-password' : 'current-password'} />
+          name={nomChamp} id={nomChamp} autoComplete={nouveau ? 'new-password' : 'current-password'}
+          autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         <button type="button" className="btn ghost sm" onClick={() => setVoir(!voir)} aria-pressed={voir}>{voir ? 'Masquer' : 'Afficher'}</button>
       </span>
       {regles && <ReglesMdp valeur={valeur} />}
     </label>
   )
+}
+
+// Identifiant caché pour les formulaires sans champ e-mail (changement de mot de passe) :
+// le trousseau sait ainsi à quel compte rattacher le nouveau mot de passe
+export function IdentifiantCache({ email }) {
+  return <input type="email" name="username" autoComplete="username" value={email || ''} readOnly hidden />
+}
+
+// Après une connexion réussie : enregistre l'identifiant dans le gestionnaire du navigateur quand il le permet
+// (Chrome, Edge, Android). Safari et le trousseau iCloud se basent sur l'envoi du formulaire.
+export async function memoriserIdentifiants(email, mdp, nom) {
+  try {
+    if (!window.PasswordCredential || !navigator.credentials?.store) return
+    await navigator.credentials.store(new window.PasswordCredential({ id: email, password: mdp, name: nom || email }))
+  } catch { /* refus ou API indisponible : sans conséquence */ }
 }
 
 // Messages d'erreur Supabase en français
