@@ -334,3 +334,14 @@ img,video,svg,canvas{max-width:100%}
 @media (max-width:640px){
   input,select,textarea{font-size:16px!important}
 }
+/* Onglets en icônes : icône + libellé sur grand écran, icône seule dans la barre du bas */
+nav.tabs a{display:inline-flex;align-items:center;gap:7px}
+nav.tabs .ico{flex:none}
+.seg a{padding:6px 14px;white-space:nowrap;flex:none;border-radius:999px;font-weight:600;color:var(--muted);text-decoration:none}
+.seg a.active{background:var(--ink);color:var(--bg)}
+@media (max-width:640px){
+  nav.tabs a{flex:1 1 0;min-width:0;justify-content:center;padding:12px 4px 10px;position:relative}
+  nav.tabs .lbl{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  nav.tabs .ico{width:24px;height:24px}
+  nav.tabs a .badge{position:absolute;top:5px;left:calc(50% + 6px);right:auto;margin:0;min-width:16px;height:16px;padding:0 4px;font-size:10px}
+}
