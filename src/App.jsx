@@ -11,8 +11,8 @@ import AthleteEntrainement from './pages/AthleteEntrainement'
 import AthleteNutrition from './pages/AthleteNutrition'
 import AthleteProfil from './pages/AthleteProfil'
 import SeanceGuidee from './pages/SeanceGuidee'
-import Exercices from './pages/Exercices'
-import Aliments from './pages/Aliments'
+import Bibliotheque from './pages/Bibliotheque'
+import { Icone } from './lib/icones'
 import Programmes from './pages/Programmes'
 import ProgrammeEditeur from './pages/ProgrammeEditeur'
 import Plans from './pages/Plans'
@@ -70,17 +70,16 @@ export default function App() {
           <nav className="tabs">
             {profil.role === 'coach' ? (
               <>
-                <NavLink to="/" end>Athlètes</NavLink>
-                <NavLink to="/programmes">Programmes</NavLink>
-                <NavLink to="/nutrition">Nutrition</NavLink>
-                <NavLink to="/exercices">Exercices</NavLink>
-                <NavLink to="/aliments">Aliments</NavLink>
-                <NavLink to="/messages">Messages{totalNonLus > 0 && !location.pathname.startsWith('/messages') && <span className="badge">{totalNonLus}</span>}</NavLink>
+                <NavLink to="/" end aria-label="Athlètes" title="Athlètes"><Icone nom="athletes" /><span className="lbl">Athlètes</span></NavLink>
+                <NavLink to="/programmes" aria-label="Programmes" title="Programmes"><Icone nom="programmes" /><span className="lbl">Programmes</span></NavLink>
+                <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
+                <NavLink to="/exercices" className={() => (/^\/(exercices|aliments)/.test(location.pathname) ? 'active' : undefined)} aria-label="Bibliothèque" title="Bibliothèque"><Icone nom="bibliotheque" /><span className="lbl">Bibliothèque</span></NavLink>
+                <NavLink to="/messages" aria-label={totalNonLus > 0 ? `Messages, ${totalNonLus} non lus` : 'Messages'} title="Messages"><Icone nom="messages" /><span className="lbl">Messages</span>{totalNonLus > 0 && !location.pathname.startsWith('/messages') && <span className="badge" aria-hidden="true">{totalNonLus}</span>}</NavLink>
               </>
             ) : (
               <>
-                <NavLink to="/" className={({ isActive }) => (isActive || /^\/(seance|progres)/.test(location.pathname) ? 'active' : undefined)} end>Entraînement</NavLink>
-                <NavLink to="/nutrition">Nutrition</NavLink>
+                <NavLink to="/" className={({ isActive }) => (isActive || /^\/(seance|progres)/.test(location.pathname) ? 'active' : undefined)} end aria-label="Entraînement" title="Entraînement"><Icone nom="entrainement" /><span className="lbl">Entraînement</span></NavLink>
+                <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
               </>
             )}
           </nav>
@@ -113,8 +112,8 @@ export default function App() {
               <Route path="/bilans/:id" element={<BilanDetail />} />
               <Route path="/compte" element={<MonCompte />} />
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
-              {profil.role === 'coach' && <Route path="/exercices" element={<Exercices />} />}
-              {profil.role === 'coach' && <Route path="/aliments" element={<Aliments />} />}
+              {profil.role === 'coach' && <Route path="/exercices" element={<Bibliotheque vue="exercices" />} />}
+              {profil.role === 'coach' && <Route path="/aliments" element={<Bibliotheque vue="aliments" />} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}
