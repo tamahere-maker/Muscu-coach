@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { ChampMdp, estSolide, memoriserIdentifiants, traduire } from '../lib/motdepasse'
 
-// Connexion, création de compte et mot de passe oublié. `role` fixe le rôle du compte créé (coach depuis l'accueil, athlète depuis une invitation).
-export default function AuthForm({ role, retour = window.location.origin + '/', titre, modeInitial = 'inscription', erreurInitiale = '' }) {
+// Connexion, création de compte et mot de passe oublié. `role` fixe le rôle du compte créé depuis une invitation ;
+// sans `role` (page d'accueil), on choisit à la création entre compte coach et compte athlète.
+export default function AuthForm({ role: roleFixe, retour = window.location.origin + '/', titre, modeInitial = 'inscription', erreurInitiale = '' }) {
   const [mode, setMode] = useState(modeInitial)
+  const [roleChoisi, setRoleChoisi] = useState('coach')
+  const role = roleFixe || roleChoisi
   const [nom, setNom] = useState('')
   const [email, setEmail] = useState('')
   const [mdp, setMdp] = useState('')
@@ -85,11 +88,20 @@ export default function AuthForm({ role, retour = window.location.origin + '/', 
   return (
     // key : un formulaire distinct par mode, pour que le gestionnaire de mots de passe distingue connexion et création de compte
     <form key={mode} className="card auth" onSubmit={valider} method="post" action="/" name={mode === 'connexion' ? 'connexion' : 'inscription'}>
-      <h2>{titre}</h2>
+      {titre && <h2>{titre}</h2>}
       <div className="seg" role="group">
         <button type="button" aria-pressed={mode === 'connexion'} onClick={() => changer('connexion')}>Se connecter</button>
         <button type="button" aria-pressed={mode === 'inscription'} onClick={() => changer('inscription')}>Créer un compte</button>
       </div>
+      {mode === 'inscription' && !roleFixe && (
+        <div className="field"><span className="label">Je crée un compte</span>
+          <div className="seg" role="group">
+            <button type="button" aria-pressed={roleChoisi === 'coach'} onClick={() => setRoleChoisi('coach')}>Coach</button>
+            <button type="button" aria-pressed={roleChoisi === 'athlete'} onClick={() => setRoleChoisi('athlete')}>Athlète</button>
+          </div>
+          {roleChoisi === 'athlete' && <p className="note" style={{ margin: 0 }}>Une fois ton compte créé, ouvre le lien d’invitation envoyé par ton coach pour qu’il te suive. Si tu l’as déjà, ouvre-le plutôt directement.</p>}
+        </div>
+      )}
       {mode === 'inscription' && (
         <label className="field"><span className="label">Nom</span>
           <input required name="name" id="name" value={nom} onChange={(e) => setNom(e.target.value)} autoComplete="name" /></label>
