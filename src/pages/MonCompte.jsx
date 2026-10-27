@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
-import { ChampMdp, estSolide, traduire } from '../lib/motdepasse'
+import { ChampMdp, IdentifiantCache, estSolide, memoriserIdentifiants, traduire } from '../lib/motdepasse'
 import { CarteApplication } from '../lib/pwa'
 import { CarteNotifications } from '../lib/Messages'
 
@@ -50,6 +50,7 @@ export default function MonCompte() {
     const { error } = await supabase.auth.updateUser({ password: mdp.nouveau })
     setOccupe(false)
     if (error) return setErr({ mdp: traduire(error.message) })
+    await memoriserIdentifiants(email, mdp.nouveau, profil.nom)
     setMdp({ actuel: '', nouveau: '', confirme: '' })
     toast('Mot de passe modifié')
   }
@@ -84,9 +85,10 @@ export default function MonCompte() {
 
       <form className="card" onSubmit={changerMdp}>
         <h2>Mot de passe</h2>
+        <IdentifiantCache email={email} />
         <ChampMdp label="Mot de passe actuel" valeur={mdp.actuel} onChange={majMdp('actuel')} />
         <ChampMdp label="Nouveau mot de passe" valeur={mdp.nouveau} onChange={majMdp('nouveau')} nouveau regles />
-        <ChampMdp label="Confirmer le mot de passe" valeur={mdp.confirme} onChange={majMdp('confirme')} nouveau />
+        <ChampMdp label="Confirmer le mot de passe" valeur={mdp.confirme} onChange={majMdp('confirme')} nouveau name="confirm-password" />
         {err.mdp && <p className="err">{err.mdp}</p>}
         <div className="row"><button className="btn" disabled={occupe}>Changer le mot de passe</button></div>
       </form>
