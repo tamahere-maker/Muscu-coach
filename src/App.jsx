@@ -30,6 +30,7 @@ import NouveauMotDePasse from './pages/NouveauMotDePasse'
 import { BandeauxPwa } from './lib/pwa'
 import Contrat from './pages/Contrat'
 import ContratModele from './pages/ContratModele'
+import { ContratRequis } from './lib/contrat'
 import ListeCourses from './pages/ListeCourses'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
@@ -104,8 +105,8 @@ export default function App() {
               <Route path="/" element={profil.role === 'coach' ? <CoachAthletes /> : <AthleteEntrainement />} />
               {profil.role === 'coach' && <Route path="/programmes" element={<Programmes />} />}
               {profil.role === 'coach' && <Route path="/programmes/:id" element={<ProgrammeEditeur />} />}
-              <Route path="/nutrition" element={profil.role === 'coach' ? <Plans /> : <AthleteNutrition />} />
-              {profil.role === 'athlete' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
+              <Route path="/nutrition" element={profil.role === 'coach' ? <Plans /> : <ContratRequis><AthleteNutrition /></ContratRequis>} />
+              {profil.role === 'athlete' && <Route path="/seance/:id" element={<ContratRequis><SeanceGuidee /></ContratRequis>} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
               {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
               <Route path="/messages" element={profil.role === 'coach' ? <CoachMessages /> : <MesMessages />} />
@@ -120,7 +121,7 @@ export default function App() {
               {profil.role === 'coach' && <Route path="/exercices" element={<Bibliotheque vue="exercices" />} />}
               {profil.role === 'coach' && <Route path="/aliments" element={<Bibliotheque vue="aliments" />} />}
               {profil.role === 'coach' && <Route path="/recettes" element={<Bibliotheque vue="recettes" />} />}
-              {profil.role === 'athlete' && <Route path="/courses" element={<ListeCourses />} />}
+              {profil.role === 'athlete' && <Route path="/courses" element={<ContratRequis><ListeCourses /></ContratRequis>} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}

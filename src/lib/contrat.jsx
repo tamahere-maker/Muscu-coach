@@ -1,3 +1,8 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useSession } from './session'
+import { supabase } from './supabase'
+
 // Contrat de coaching : génération du texte à partir du modèle du coach, empreinte et libellés.
 // Le texte est figé dans la base à l'envoi ; l'athlète accepte exactement ce texte (empreinte SHA-256 vérifiée).
 
@@ -99,5 +104,27 @@ export function TexteContrat({ texte }) {
         : l.startsWith('- ') ? <p key={i} className="puce">{l.slice(2)}</p>
         : l.trim() ? <p key={i}>{l}</p> : null)}
     </div>
+  )
+}
+
+// Écrans de l'athlète (nutrition, liste de courses, séance) masqués tant qu'un contrat envoyé n'est pas accepté
+export function ContratRequis({ children }) {
+  const { profil } = useSession()
+  const [contrat, setContrat] = useState(undefined)
+  useEffect(() => {
+    supabase.from('contrats').select('id, titre, coach:profiles!contrats_coach_id_fkey(nom)').eq('athlete_id', profil.id).eq('statut', 'envoye')
+      .order('created_at', { ascending: false }).limit(1).then(({ data, error }) => setContrat(error ? null : data?.[0] ?? null))
+  }, [profil.id])
+  if (contrat === undefined) return null
+  if (!contrat) return children
+  return (
+    <>
+      <div><h1>Contrat à accepter</h1>
+        <p className="sub">Ton programme et ton plan alimentaire s’afficheront une fois le contrat de coaching proposé par {contrat.coach?.nom || 'ton coach'} accepté.</p></div>
+      <Link className="card a-faire" to={`/contrats/${contrat.id}`}>
+        <strong>Lire et accepter : {contrat.titre}</strong>
+        <span className="sub">Prix, durée, rétractation et données personnelles : tout est expliqué.</span>
+      </Link>
+    </>
   )
 }
