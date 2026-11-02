@@ -372,3 +372,19 @@ nav.tabs .ico{flex:none}
   body{background:#fff;color:#000}
   .card{border:0;padding:0;background:none}
 }
+
+/* Bibliothèque d'exercices : illustrations wger, favoris, vidéos, variantes */
+.anim.img{background-size:contain;background-position:center}
+.anim.img::after{content:none}
+.filtres{display:flex;gap:8px;flex-wrap:wrap}
+.filtres select{flex:1 1 140px;min-width:0}
+.etoile{border:0;background:none;font-size:22px;line-height:1;color:var(--muted);padding:2px 4px}
+.etoile[aria-pressed="true"]{color:#e0a100}
+.fav{color:#e0a100}
+.video-ex{display:grid;gap:6px}
+.video-ex iframe,.video-ex video{width:100%;aspect-ratio:16/9;border:0;border-radius:10px;background:#000}
+.fiche-bloc{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+.fiche-bloc h3{margin:0;font-size:15px}
+.var-liste{display:grid;gap:6px}
+.licence{font-size:12px}
+.video-ex summary{cursor:pointer;font-weight:600;color:var(--accent)}
