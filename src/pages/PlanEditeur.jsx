@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { macrosDe, manquePourMetabolisme, metabolisme, resume, somme, unites } from '../lib/nutrition'
 import Quantite from '../lib/Quantite'
+import RechercheOFF from '../lib/RechercheOFF'
+import { garderProduit } from '../lib/openfoodfacts'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const OBJECTIFS = [['kcal', 'Calories (kcal)'], ['proteines', 'Protéines (g)'], ['glucides', 'Glucides (g)'], ['lipides', 'Lipides (g)']]
@@ -23,6 +25,7 @@ export default function PlanEditeur() {
   const [cible, setCible] = useState('')
   const [choix, setChoix] = useState(null) // { repas } pour ajouter un aliment, { ligne } pour une alternative
   const [q, setQ] = useState('')
+  const [off, setOff] = useState(false) // recherche Open Food Facts ouverte dans la fenêtre de choix
   const dlg = useRef()
 
   async function charger() {
@@ -36,13 +39,14 @@ export default function PlanEditeur() {
   }
   useEffect(() => { charger() }, [id])
   useEffect(() => {
-    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
+    supabase.from('aliments').select('id, categorie, nom, marque, code_barres, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
   }, [profil.id])
   useEffect(() => { if (choix && !dlg.current.open) dlg.current.showModal() }, [choix])
 
+  const codes = useMemo(() => new Set(aliments.map((a) => a.code_barres).filter(Boolean)), [aliments])
   const alim = useMemo(() => Object.fromEntries(aliments.map((a) => [a.id, a])), [aliments])
   const resultats = useMemo(() => {
     const t = sansAccent(q.trim())
@@ -88,6 +92,17 @@ export default function PlanEditeur() {
     }
     dlg.current.close()
     charger()
+  }
+
+  // Produit Open Food Facts : gardé dans la bibliothèque (un exemplaire par code-barres), puis ajouté au repas
+  async function choisirOFF(p) {
+    let a = aliments.find((x) => x.code_barres === p.code_barres)
+    if (!a) {
+      try { a = await garderProduit(p, profil.id) } catch (e) { return toast(e.message) }
+      setAliments((l) => [...l, a].sort((x, y) => x.nom.localeCompare(y.nom)))
+      toast(`${a.nom} ajouté à la bibliothèque`)
+    }
+    choisir(a)
   }
 
   async function ajouterComplement() {
@@ -235,7 +250,7 @@ export default function PlanEditeur() {
 
       <div className="row"><button className="linkbtn" onClick={supprimer}>Supprimer ce plan</button></div>
 
-      <dialog ref={dlg} onClose={() => setChoix(null)}>
+      <dialog ref={dlg} onClose={() => { setChoix(null); setOff(false) }}>
         {choix && (
           <div className="dlg">
             <div className="dlg-head"><h2>{choix.repas ? `Ajouter à ${choix.repas.nom}` : `Alternative à ${alim[choix.ligne.aliment_id]?.nom}`}</h2>
@@ -249,6 +264,12 @@ export default function PlanEditeur() {
                   <span className="pill acc">Ajouter</span>
                 </button>
               ))}
+              {resultats.length === 0 && <p className="empty">Rien dans la bibliothèque pour « {q.trim()} ».</p>}
+            </div>
+            <div className="off-lien">
+              {off
+                ? <RechercheOFF terme={q} connus={codes} libelle="Ajouter" onChoisir={choisirOFF} />
+                : <button className="linkbtn" style={{ justifySelf: 'start' }} onClick={() => setOff(true)}>Produit du commerce ? Chercher {q.trim() ? `« ${q.trim()} » ` : ''}dans Open Food Facts</button>}
             </div>
           </div>
         )}
