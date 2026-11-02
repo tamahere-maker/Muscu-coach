@@ -7,6 +7,7 @@ import { macrosDe, manquePourMetabolisme, metabolisme, resume, somme, unites } f
 import Quantite from '../lib/Quantite'
 import RechercheOFF from '../lib/RechercheOFF'
 import { garderProduit } from '../lib/openfoodfacts'
+import { TYPES_JOUR } from '../lib/jours'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const OBJECTIFS = [['kcal', 'Calories (kcal)'], ['proteines', 'Protéines (g)'], ['glucides', 'Glucides (g)'], ['lipides', 'Lipides (g)']]
@@ -30,16 +31,20 @@ export default function PlanEditeur() {
   const [choix, setChoix] = useState(null) // { repas } pour ajouter un aliment, { ligne } pour une alternative
   const [q, setQ] = useState('')
   const [off, setOff] = useState(false) // recherche Open Food Facts ouverte dans la fenêtre de choix
+  const [vueJour, setVueJour] = useState('entrainement') // type de jour affiché quand le plan a des jours différents
+  const [recettes, setRecettes] = useState([])
   const dlg = useRef()
+  // Champ d'un objectif pour le type de jour affiché (kcal, ou kcal_repos le jour de repos)
+  const cle = (k) => (plan?.jours_differents && vueJour === 'repos' ? `${k}_repos` : k)
   // Objectifs du jour en cours de saisie : les calories suivent les macros (4/4/9 kcal par g)
   const [obj, setObj] = useState({})
   useEffect(() => {
-    if (plan) setObj(Object.fromEntries(OBJECTIFS.map(([k]) => [k, versTexte(plan[k])])))
-  }, [plan?.kcal, plan?.proteines, plan?.glucides, plan?.lipides]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (plan) setObj(Object.fromEntries(OBJECTIFS.map(([k]) => [k, versTexte(plan[cle(k)])])))
+  }, [plan?.kcal, plan?.proteines, plan?.glucides, plan?.lipides, plan?.kcal_repos, plan?.proteines_repos, plan?.glucides_repos, plan?.lipides_repos, plan?.jours_differents, vueJour]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function charger() {
     const { data } = await supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(id, nom, dose, moment)')
       .eq('id', id).single()
     if (!data) return
     setPlan(data)
@@ -52,7 +57,12 @@ export default function PlanEditeur() {
       .then(({ data }) => setAliments(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
+    chargerRecettes()
   }, [profil.id])
+  function chargerRecettes() {
+    supabase.from('recettes').select('id, nom, recette_aliments(aliment_id, grammes)').eq('coach_id', profil.id).order('nom')
+      .then(({ data }) => setRecettes(data ?? []))
+  }
   useEffect(() => { if (choix && !dlg.current.open) dlg.current.showModal() }, [choix])
 
   const codes = useMemo(() => new Set(aliments.map((a) => a.code_barres).filter(Boolean)), [aliments])
@@ -62,8 +72,15 @@ export default function PlanEditeur() {
     return aliments.filter((a) => !t || sansAccent(a.nom).includes(t) || sansAccent(a.marque ?? '').includes(t) || sansAccent(a.categorie).includes(t)).slice(0, 40)
   }, [aliments, q])
 
+  const recettesTrouvees = useMemo(() => {
+    const t = sansAccent(q.trim())
+    return recettes.filter((r) => !t || sansAccent(r.nom).includes(t))
+  }, [recettes, q])
+  // Repas affichés : ceux du type de jour choisi quand le plan a des jours différents
+  const visibles = plan?.jours_differents ? repas.filter((r) => r.type_jour === 'tous' || r.type_jour === vueJour) : repas
+
   const totalRepas = (r) => somme(r.repas_aliments.filter((l) => alim[l.aliment_id]).map((l) => macrosDe(alim[l.aliment_id], l.grammes)))
-  const totalJour = somme(repas.map(totalRepas))
+  const totalJour = somme(visibles.map(totalRepas))
 
   const majPlan = async (champs) => {
     setPlan((p) => ({ ...p, ...champs }))
@@ -78,7 +95,7 @@ export default function PlanEditeur() {
 
   async function ajouterRepas() {
     const ordre = repas.length ? Math.max(...repas.map((r) => r.ordre)) + 1 : 0
-    await supabase.from('repas').insert({ plan_id: id, ordre, nom: REPAS_TYPES[repas.length] ?? `Repas ${repas.length + 1}` })
+    await supabase.from('repas').insert({ plan_id: id, ordre, nom: REPAS_TYPES[visibles.length] ?? `Repas ${visibles.length + 1}`, type_jour: plan.jours_differents ? vueJour : 'tous' })
     charger()
   }
   async function supprimerRepas(r) {
@@ -114,6 +131,34 @@ export default function PlanEditeur() {
     choisir(a)
   }
 
+  // Recette du coach : ses aliments sont copiés dans le repas
+  async function choisirRecette(rec) {
+    const { error } = await supabase.rpc('ajouter_recette', { rec: rec.id, rp: choix.repas.id })
+    if (error) return toast(error.message)
+    dlg.current.close()
+    toast(`${rec.nom} ajoutée`)
+    charger()
+  }
+  async function enregistrerRecette(r) {
+    const nom = prompt('Nom de la recette', r.nom)?.trim()
+    if (!nom) return
+    const { data, error } = await supabase.from('recettes').insert({ coach_id: profil.id, nom }).select('id').single()
+    if (error) return toast(error.message)
+    const { error: e2 } = await supabase.from('recette_aliments').insert(r.repas_aliments.map((l, i) => ({ recette_id: data.id, ordre: i, aliment_id: l.aliment_id, grammes: l.grammes, unite: l.unite })))
+    if (e2) return toast(e2.message)
+    toast(`Recette « ${nom} » enregistrée`)
+    chargerRecettes()
+  }
+  // Jours différents : sépare le plan en jour d'entraînement / jour de repos, ou revient à un plan unique
+  async function basculerJours() {
+    if (plan.jours_differents && !confirm('Revenir à un seul plan pour tous les jours ? Les repas du jour de repos seront supprimés.')) return
+    const { error } = await supabase.rpc(plan.jours_differents ? 'reunir_jours' : 'separer_jours', { p: id })
+    if (error) return toast(error.message)
+    if (!plan.jours_differents) toast('Repas copiés pour le jour de repos : ajuste-les')
+    setVueJour('entrainement')
+    charger()
+  }
+
   async function ajouterComplement() {
     await supabase.from('complements').insert({ plan_id: id, nom: 'Nouveau complément' })
     charger()
@@ -143,14 +188,17 @@ export default function PlanEditeur() {
     const champs = {}
     for (const [k] of OBJECTIFS) {
       const v = versNombre(obj[k] ?? '')
-      if (v !== (plan[k] ?? null)) champs[k] = v
+      if (v !== (plan[cle(k)] ?? null)) champs[cle(k)] = v
     }
     if (Object.keys(champs).length) majPlan(champs)
   }
 
   if (!plan) return null
   const modele = !plan.athlete_id
-  const kcalMacros = 4 * (plan.proteines ?? 0) + 4 * (plan.glucides ?? 0) + 9 * (plan.lipides ?? 0)
+  const buts = Object.fromEntries(OBJECTIFS.map(([k]) => [k, plan[cle(k)]]))
+  const kcalMacros = 4 * (buts.proteines ?? 0) + 4 * (buts.glucides ?? 0) + 9 * (buts.lipides ?? 0)
+  const poids = plan.athlete?.athlete_profiles?.poids_kg
+  const eauConseil = poids ? Math.round((poids * 35) / 250) * 250 : null
 
   return (
     <>
@@ -170,10 +218,10 @@ export default function PlanEditeur() {
           const ap = plan.athlete?.athlete_profiles, m = metabolisme(ap)
           return m ? (
             <p className="note">Métabolisme de base de {plan.athlete.nom} : <strong>{fmt(m.base)} kcal</strong> · dépense du jour estimée : <strong>{fmt(m.depense)} kcal</strong>
-              {plan.kcal !== m.depense && <button type="button" onClick={() => majPlan({ kcal: m.depense })}>Mettre en objectif</button>}</p>
+              {buts.kcal !== m.depense && <button type="button" onClick={() => majPlan({ [cle('kcal')]: m.depense })}>Mettre en objectif</button>}</p>
           ) : <p className="note">Métabolisme de base : il manque {manquePourMetabolisme(ap).join(', ')} dans le profil de l’athlète.</p>
         })()}
-        <span className="label">Objectifs par jour</span>
+        <span className="label">{plan.jours_differents ? `Objectifs du ${TYPES_JOUR[vueJour].toLowerCase()}` : 'Objectifs par jour'}</span>
         <div className="params">
           {OBJECTIFS.map(([k, lib]) => (
             <label key={k} className="field"><span className="label">{lib}</span>
@@ -182,30 +230,49 @@ export default function PlanEditeur() {
                 onBlur={enregistrerObjectifs} /></label>
           ))}
         </div>
-        {kcalMacros > 0 && Math.abs(kcalMacros - (plan.kcal ?? 0)) > 20 && (
-          <p className="note">Les macros font {fmt(kcalMacros)} kcal. <button type="button" onClick={() => majPlan({ kcal: kcalMacros })}>Utiliser ce total</button></p>
+        {kcalMacros > 0 && Math.abs(kcalMacros - (buts.kcal ?? 0)) > 20 && (
+          <p className="note">Les macros font {fmt(kcalMacros)} kcal. <button type="button" onClick={() => majPlan({ [cle('kcal')]: kcalMacros })}>Utiliser ce total</button></p>
+        )}
+        <label className="field"><span className="label">Eau par jour (ml)</span>
+          <input key={plan.eau_ml ?? ''} type="number" min="0" step="250" inputMode="numeric" defaultValue={plan.eau_ml ?? ''}
+            placeholder={eauConseil ? `Conseillé : ${fmt(eauConseil)} ml (35 ml par kg)` : 'Ex. 2500'}
+            onBlur={(e) => { const v = versNombre(e.target.value); if (v !== (plan.eau_ml ?? null)) majPlan({ eau_ml: v }) }} /></label>
+        {eauConseil && plan.eau_ml !== eauConseil && <p className="note">Conseillé pour {fmt(poids)} kg : {fmt(eauConseil)} ml par jour. <button type="button" onClick={() => majPlan({ eau_ml: eauConseil })}>Mettre en objectif</button></p>}
+      </div>
+
+      <div className="card">
+        <label className="check">
+          <input type="checkbox" checked={!!plan.jours_differents} onChange={basculerJours} />
+          <span><strong>Plan différent les jours de repos</strong><br />
+            <span className="sub">L’athlète voit le plan du jour d’entraînement ou du jour de repos selon les jours prévus dans son programme. Il peut aussi changer le type du jour.</span></span>
+        </label>
+        {plan.jours_differents && (
+          <div className="seg" role="group" aria-label="Type de jour">
+            {Object.entries(TYPES_JOUR).map(([k, l]) => <button key={k} aria-pressed={vueJour === k} onClick={() => setVueJour(k)}>{l}</button>)}
+          </div>
         )}
       </div>
 
       <div className="card bilan">
-        <span className="label">Total des repas</span>
+        <span className="label">Total des repas{plan.jours_differents ? ` · ${TYPES_JOUR[vueJour].toLowerCase()}` : ''}</span>
         <div className="macros4">
           {OBJECTIFS.map(([k, lib]) => (
-            <div key={k} className={plan[k] && Math.abs(totalJour[k] - plan[k]) / plan[k] > 0.1 ? 'ecart' : undefined}>
-              <b>{fmt(totalJour[k])}</b><span className="label">{plan[k] ? `/ ${fmt(plan[k])}` : lib.split(' ')[0]}</span>
+            <div key={k} className={buts[k] && Math.abs(totalJour[k] - buts[k]) / buts[k] > 0.1 ? 'ecart' : undefined}>
+              <b>{fmt(totalJour[k])}</b><span className="label">{buts[k] ? `/ ${fmt(buts[k])}` : lib.split(' ')[0]}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {repas.map((r, i) => (
+      {visibles.map((r, i) => (
         <div key={r.id} className="card">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <input type="text" aria-label="Nom du repas" defaultValue={r.nom} style={{ maxWidth: 260, fontWeight: 700 }}
               onBlur={(e) => e.target.value.trim() && e.target.value !== r.nom && maj('repas', r, { nom: e.target.value.trim() })} />
             <span className="row">
               <button className="icon-btn" aria-label="Monter le repas" disabled={i === 0}
-                onClick={() => Promise.all([maj('repas', r, { ordre: repas[i - 1].ordre }), maj('repas', repas[i - 1], { ordre: r.ordre })])}>↑</button>
+                onClick={() => Promise.all([maj('repas', r, { ordre: visibles[i - 1].ordre }), maj('repas', visibles[i - 1], { ordre: r.ordre })])}>↑</button>
+              {r.repas_aliments.length > 0 && <button className="linkbtn" onClick={() => enregistrerRecette(r)}>Enregistrer comme recette</button>}
               <button className="linkbtn" onClick={() => supprimerRepas(r)}>Supprimer</button>
             </span>
           </div>
@@ -218,7 +285,7 @@ export default function PlanEditeur() {
             return (
               <div key={l.id} className="plan-ligne">
                 <div className="row" style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
-                  <strong>{a.nom}{a.marque && <small className="sub"> · {a.marque}</small>}</strong>
+                  <strong>{a.nom}{a.marque && <small className="sub"> · {a.marque}</small>}{l.recette && <small className="sub"> · {l.recette}</small>}</strong>
                   <button className="icon-btn" aria-label={`Retirer ${a.nom}`} onClick={async () => { await supabase.from('repas_aliments').delete().eq('id', l.id); charger() }}>×</button>
                 </div>
                 <div className="row" style={{ flexWrap: 'nowrap' }}>
@@ -285,6 +352,13 @@ export default function PlanEditeur() {
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
             <input type="search" autoFocus placeholder="Aliment, marque ou catégorie" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="pick-list">
+              {choix.repas && recettesTrouvees.map((rec) => (
+                <button key={rec.id} className="pick pick-aliment" onClick={() => choisirRecette(rec)}>
+                  <span><strong>{rec.nom}</strong><br />
+                    <small className="sub">Recette · {rec.recette_aliments.length} aliment{rec.recette_aliments.length > 1 ? 's' : ''} · {resume(somme(rec.recette_aliments.filter((l) => alim[l.aliment_id]).map((l) => macrosDe(alim[l.aliment_id], l.grammes))))}</small></span>
+                  <span className="pill acc">Ajouter</span>
+                </button>
+              ))}
               {resultats.map((a) => (
                 <button key={a.id} className="pick pick-aliment" onClick={() => choisir(a)}>
                   <span><strong>{a.nom}</strong>{a.marque && <small className="sub"> · {a.marque}</small>}<br />

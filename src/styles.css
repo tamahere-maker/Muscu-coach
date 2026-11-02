@@ -351,3 +351,9 @@ nav.tabs .ico{flex:none}
 .pick-off img,.pick-off .off-vide{width:44px;height:44px;object-fit:contain;border-radius:6px;background:#fff}
 .pick-off:disabled{opacity:.55;cursor:default}
 .off-lien{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:10px}
+
+/* Eau et liste de courses */
+.eau .bar{height:10px;border-radius:5px;background:var(--surface-2);overflow:hidden}
+.eau .bar i{display:block;height:100%}
+.m-eau{background:var(--gluc)}
+.courses .pris{text-decoration:line-through;color:var(--muted)}
