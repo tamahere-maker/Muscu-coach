@@ -5,8 +5,9 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, fmt, toast } from '../lib/ui'
 import { EcrireAuCoach } from '../lib/Messages'
+import { Video, VideoCoach } from '../lib/VideoExercice'
 
-const CHAMPS_EX = 'id, nom, sprite, consigne, lien_video, muscles, materiel, categorie, force, mecanique, niveau, essentiel'
+const CHAMPS_EX = 'id, nom, sprite, image_url, consigne, consigne_en, lien_video, licence, wger_id, muscles, materiel, categorie, force, mecanique, niveau, essentiel'
 const chrono = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`
 
@@ -20,12 +21,13 @@ export default function SeanceGuidee() {
   const [materiel, setMateriel] = useState([])
   const [run, setRun] = useState(() => lireEnCours())
   const [, tic] = useState(0)
-  const [choixRempl, setChoixRempl] = useState(null)
+  const [choixRempl, setChoixRempl] = useState(null) // { variantes, autres }
+  const [videos, setVideos] = useState({}) // exercice_id → vidéo du coach
   const [envoi, setEnvoi] = useState(false)
   const dlg = useRef()
 
   useEffect(() => {
-    supabase.from('seances').select(`id, nom, note, programme:programmes(nom), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(${CHAMPS_EX}))`)
+    supabase.from('seances').select(`id, nom, note, programme:programmes(nom, coach_id), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(${CHAMPS_EX}))`)
       .eq('id', id).maybeSingle().then(({ data }) => setS(data && { ...data, lignes: [...data.seance_exercices].sort((a, b) => a.ordre - b.ordre) }))
     supabase.from('seances_realisees').select('date, series_realisees(exercice_id, ordre, reps, charge_kg)').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).limit(20).then(({ data }) => {
@@ -39,6 +41,19 @@ export default function SeanceGuidee() {
       })
     supabase.from('athlete_profiles').select('materiel').eq('athlete_id', profil.id).maybeSingle().then(({ data }) => setMateriel(data?.materiel ?? []))
   }, [id, profil.id])
+
+  // Vidéos perso des coachs pour les exercices de la séance (et leurs remplaçants), celle du coach du programme d'abord
+  const idsEx = s ? [...new Set([...s.lignes.map((l) => l.exercice.id), ...Object.values(run?.seance === id ? run.rempl : {}).map((x) => x.id)])] : []
+  const cleIds = idsEx.sort().join(',')
+  useEffect(() => {
+    if (!idsEx.length) return
+    supabase.from('videos_exercices').select('coach_id, exercice_id, url, chemin, updated_at').in('exercice_id', idsEx).then(({ data }) => {
+      const v = {}
+      ;(data ?? []).sort((a, b) => (b.coach_id === s.programme?.coach_id) - (a.coach_id === s.programme?.coach_id))
+        .forEach((x) => { v[x.exercice_id] ??= x })
+      setVideos(v)
+    })
+  }, [cleIds])
 
   const actif = run?.seance === id ? run : null
   const repos = actif?.repos ? Math.ceil((actif.repos - Date.now()) / 1000) : 0
@@ -148,8 +163,16 @@ export default function SeanceGuidee() {
   }
 
   async function ouvrirRempl() {
-    const { data } = await supabase.from('exercices').select(CHAMPS_EX).contains('muscles', [l.exercice.muscles?.[0] ?? '']).limit(300)
-    setChoixRempl(remplacants(l.exercice, data ?? [], materiel))
+    const e0 = l.exercice.id
+    const [{ data }, { data: liens }] = await Promise.all([
+      supabase.from('exercices').select(CHAMPS_EX).contains('muscles', [l.exercice.muscles?.[0] ?? '']).limit(300),
+      supabase.from('variantes_exercices').select('exercice_a, exercice_b').or(`exercice_a.eq.${e0},exercice_b.eq.${e0}`),
+    ])
+    // Variantes liées par le coach d'abord, puis les équivalents trouvés automatiquement
+    const idsVar = [...new Set((liens ?? []).map((x) => (x.exercice_a === e0 ? x.exercice_b : x.exercice_a)))]
+    const { data: vars } = idsVar.length ? await supabase.from('exercices').select(CHAMPS_EX).in('id', idsVar) : { data: [] }
+    const variantes = vars ?? []
+    setChoixRempl({ variantes, autres: remplacants(l.exercice, data ?? [], materiel).filter((x) => !idsVar.includes(x.id)) })
     dlg.current.showModal()
   }
   function remplacer(x) {
@@ -229,8 +252,13 @@ export default function SeanceGuidee() {
         <div className="card">
           <Anim ex={ex} cls="big" />
           {l.note && <div className="note-coach"><span className="label">Note du coach</span><p style={{ margin: 0 }}>{l.note}</p></div>}
-          {ex.consigne && <p style={{ margin: 0 }}>{ex.consigne}</p>}
-          {ex.lien_video && <a className="linkbtn" href={ex.lien_video} target="_blank" rel="noreferrer">Voir la vidéo</a>}
+          {ex.consigne ? <p style={{ margin: 0, whiteSpace: 'pre-line' }}>{ex.consigne}</p> : ex.consigne_en && <p className="sub" lang="en" style={{ margin: 0, whiteSpace: 'pre-line' }}>{ex.consigne_en}</p>}
+          {videos[ex.id] ? (
+            <details key={`c-${ex.id}`} className="video-ex" open><summary>Vidéo de ton coach</summary><VideoCoach v={videos[ex.id]} titre={`Vidéo de ${ex.nom}`} /></details>
+          ) : ex.lien_video && (
+            <details key={`b-${ex.id}`} className="video-ex"><summary>Voir la vidéo</summary><Video url={ex.lien_video} titre={ex.nom} /></details>
+          )}
+          {ex.licence && <small className="sub licence">Source : {ex.licence}</small>}
           <EcrireAuCoach exercice={ex} seanceId={s.id} />
         </div>
         <div className="card setcard">
@@ -296,12 +324,17 @@ export default function SeanceGuidee() {
                   <Anim ex={l.exercice} cls="s" /><span><strong>{l.exercice.nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>Exercice prévu par ton coach</span></span><span className="pill">Revenir</span>
                 </button>
               )}
-              {choixRempl.filter((x) => x.id !== ex.id).map((x) => (
+              {choixRempl.variantes.filter((x) => x.id !== ex.id).map((x) => (
+                <button key={x.id} className="sub-item" onClick={() => remplacer(x)}>
+                  <Anim ex={x} cls="s" /><span><strong>{x.nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>Variante proposée par ton coach · {x.materiel}</span></span><span className="pill acc">Choisir</span>
+                </button>
+              ))}
+              {choixRempl.autres.filter((x) => x.id !== ex.id).map((x) => (
                 <button key={x.id} className="sub-item" onClick={() => remplacer(x)}>
                   <Anim ex={x} cls="s" /><span><strong>{x.nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>{x.materiel} · {x.muscles.join(', ')}</span></span><span className="pill">Choisir</span>
                 </button>
               ))}
-              {!choixRempl.length && <p className="empty">Aucun exercice équivalent trouvé.</p>}
+              {!choixRempl.variantes.length && !choixRempl.autres.length && <p className="empty">Aucun exercice équivalent trouvé.</p>}
             </div>
           </div>
         )}

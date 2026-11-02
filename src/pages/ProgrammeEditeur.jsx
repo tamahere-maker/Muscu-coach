@@ -5,9 +5,12 @@ import { supabase } from '../lib/supabase'
 import { Anim, toast } from '../lib/ui'
 import { blocs } from '../lib/supersets'
 import NouvelExercice from '../lib/NouvelExercice'
+import RechercheWger from '../lib/RechercheWger'
+import { chercherExercices } from '../lib/recherche'
+import { garderExercice } from '../lib/wger'
+import { useFavoris } from '../lib/FicheCoach'
 import { JOURS_SEMAINE } from '../lib/jours'
 
-const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const CHAMPS_EX = [['series', 'Séries', 1], ['reps', 'Reps', 1], ['charge_kg', 'Charge (kg)', 0.5], ['repos_s', 'Repos (s)', 15]]
 
 // Édition d'un programme : un modèle du coach, ou le programme d'un athlète
@@ -22,7 +25,8 @@ export default function ProgrammeEditeur() {
   const [cible, setCible] = useState('')
   const [ajoutDans, setAjoutDans] = useState(null)
   const [q, setQ] = useState('')
-  const [creation, setCreation] = useState(false)
+  const [creation, setCreation] = useState(false) // false | true | 'wger'
+  const [fav] = useFavoris(profil.id)
   const [remplace, setRemplace] = useState(null) // ligne dont on change l'exercice
   const [sources, setSources] = useState(null) // programmes où copier une séance
   const dlg = useRef()
@@ -39,7 +43,7 @@ export default function ProgrammeEditeur() {
   }
   useEffect(() => { charger() }, [id])
   useEffect(() => {
-    supabase.from('exercices').select('id, nom, muscles, materiel, essentiel, sprite, cree_par').order('id').then(({ data }) => setExos(data ?? []))
+    supabase.from('exercices').select('id, nom, muscles, secondaires, materiel, essentiel, sprite, cree_par, image_url, wger_id').order('id').then(({ data }) => setExos(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
   }, [profil.id])
@@ -47,10 +51,19 @@ export default function ProgrammeEditeur() {
 
   const exo = useMemo(() => Object.fromEntries(exos.map((e) => [e.id, e])), [exos])
   const choix = useMemo(() => {
-    const t = sansAccent(q.trim())
-    return exos.filter((e) => !t || sansAccent(e.nom).includes(t) || e.muscles.some((m) => sansAccent(m).includes(t)))
-      .sort((a, b) => !!b.cree_par - !!a.cree_par || b.essentiel - a.essentiel).slice(0, 40)
-  }, [exos, q])
+    // Sans recherche : favoris, puis exercices perso, puis essentiels ; avec recherche : pertinence, favoris d'abord à égalité
+    const base = q.trim() ? chercherExercices(exos, q)
+      : [...exos].sort((a, b) => fav.has(b.id) - fav.has(a.id) || !!b.cree_par - !!a.cree_par || b.essentiel - a.essentiel)
+    return base.slice(0, 40)
+  }, [exos, q, fav])
+  const wgerConnus = useMemo(() => new Set(exos.filter((e) => e.wger_id).map((e) => e.wger_id)), [exos])
+  async function importerWger(w) {
+    try {
+      const e = await garderExercice(w, profil.id)
+      setExos((x) => (x.some((y) => y.id === e.id) ? x : [...x, e]))
+      setCreation(false); ajouterExercice(e)
+    } catch (err) { toast(err.message) }
+  }
 
   const majProg = async (champs) => {
     setProg((p) => ({ ...p, ...champs }))
@@ -292,17 +305,21 @@ export default function ProgrammeEditeur() {
           <div className="dlg">
             <div className="dlg-head"><h2>{remplace ? `Remplacer ${exo[remplace.exercice_id]?.nom}` : `Ajouter à ${ajoutDans.nom}`}</h2>
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
-            {creation ? (
+            {creation === 'wger' ? (<>
+              <RechercheWger terme={q} connus={wgerConnus} libelle={remplace ? 'Choisir' : 'Ajouter'} onChoisir={importerWger} />
+              <div className="row"><button type="button" className="btn ghost sm" onClick={() => setCreation(false)}>‹ Retour à la bibliothèque</button></div>
+            </>) : creation ? (
               <NouvelExercice nomInitial={q} coachId={profil.id} onAnnuler={() => setCreation(false)}
                 onCree={(e) => { setExos((x) => [...x, e]); setCreation(false); ajouterExercice(e) }} />
             ) : <>
             <input type="search" autoFocus placeholder="Exercice ou muscle" value={q} onChange={(e) => setQ(e.target.value)} />
             <button className="creer" onClick={() => setCreation(true)}>+ Créer un exercice{q.trim() ? ` « ${q.trim()} »` : ''} absent de la bibliothèque</button>
+            <button className="creer" onClick={() => setCreation('wger')}>Chercher{q.trim() ? ` « ${q.trim()} »` : ''} sur wger (base ouverte, avec vidéos)</button>
             <div className="pick-list">
               {choix.map((e) => (
                 <button key={e.id} className="pick" onClick={() => ajouterExercice(e)}>
                   <Anim ex={e} cls="t" />
-                  <span><strong>{e.nom}</strong>{e.cree_par && <span className="pill"> Perso</span>}<br /><small className="sub">{e.muscles.join(', ')} · {e.materiel}</small></span>
+                  <span><strong>{fav.has(e.id) && <span className="fav" aria-label="Favori">★ </span>}{e.nom}</strong>{e.wger_id ? <span className="pill"> wger</span> : e.cree_par && <span className="pill"> Perso</span>}<br /><small className="sub">{e.muscles.join(', ')} · {e.materiel}</small></span>
                   <span className="pill acc">{remplace ? 'Choisir' : 'Ajouter'}</span>
                 </button>
               ))}
