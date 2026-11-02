@@ -10,6 +10,10 @@ import { garderProduit } from '../lib/openfoodfacts'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const OBJECTIFS = [['kcal', 'Calories (kcal)'], ['proteines', 'Protéines (g)'], ['glucides', 'Glucides (g)'], ['lipides', 'Lipides (g)']]
+const MACROS = ['proteines', 'glucides', 'lipides']
+const KCAL_PAR_G = { proteines: 4, glucides: 4, lipides: 9 }
+const versTexte = (v) => (v ?? '') === '' ? '' : String(v)
+const versNombre = (t) => t === '' ? null : Math.round(Number(t))
 const REPAS_TYPES = ['Petit-déjeuner', 'Déjeuner', 'Collation', 'Dîner', 'Avant l’entraînement', 'Après l’entraînement']
 
 // Édition d'un plan alimentaire : un modèle du coach, ou le plan d'un athlète
@@ -27,6 +31,11 @@ export default function PlanEditeur() {
   const [q, setQ] = useState('')
   const [off, setOff] = useState(false) // recherche Open Food Facts ouverte dans la fenêtre de choix
   const dlg = useRef()
+  // Objectifs du jour en cours de saisie : les calories suivent les macros (4/4/9 kcal par g)
+  const [obj, setObj] = useState({})
+  useEffect(() => {
+    if (plan) setObj(Object.fromEntries(OBJECTIFS.map(([k]) => [k, versTexte(plan[k])])))
+  }, [plan?.kcal, plan?.proteines, plan?.glucides, plan?.lipides]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function charger() {
     const { data } = await supabase.from('plans_nutrition')
@@ -121,6 +130,24 @@ export default function PlanEditeur() {
     nav(plan.athlete_id ? '/' : '/nutrition')
   }
 
+  function saisirObjectif(k, v) {
+    setObj((o) => {
+      const n = { ...o, [k]: v }
+      if (MACROS.includes(k) && MACROS.some((m) => n[m] !== '')) {
+        n.kcal = String(Math.round(MACROS.reduce((t, m) => t + KCAL_PAR_G[m] * (Number(n[m]) || 0), 0)))
+      }
+      return n
+    })
+  }
+  function enregistrerObjectifs() {
+    const champs = {}
+    for (const [k] of OBJECTIFS) {
+      const v = versNombre(obj[k] ?? '')
+      if (v !== (plan[k] ?? null)) champs[k] = v
+    }
+    if (Object.keys(champs).length) majPlan(champs)
+  }
+
   if (!plan) return null
   const modele = !plan.athlete_id
   const kcalMacros = 4 * (plan.proteines ?? 0) + 4 * (plan.glucides ?? 0) + 9 * (plan.lipides ?? 0)
@@ -150,8 +177,9 @@ export default function PlanEditeur() {
         <div className="params">
           {OBJECTIFS.map(([k, lib]) => (
             <label key={k} className="field"><span className="label">{lib}</span>
-              <input type="number" min="0" defaultValue={plan[k] ?? ''} key={`${k}-${plan[k]}`}
-                onBlur={(e) => Number(e.target.value || null) !== (plan[k] ?? 0) && majPlan({ [k]: e.target.value === '' ? null : Math.round(Number(e.target.value)) })} /></label>
+              <input type="number" min="0" inputMode="decimal" value={obj[k] ?? ''}
+                onChange={(e) => saisirObjectif(k, e.target.value)}
+                onBlur={enregistrerObjectifs} /></label>
           ))}
         </div>
         {kcalMacros > 0 && Math.abs(kcalMacros - (plan.kcal ?? 0)) > 20 && (
