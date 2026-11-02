@@ -3,10 +3,10 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import Scanner from '../lib/Scanner'
-import { chercherProduit, complet } from '../lib/openfoodfacts'
+import RechercheOFF from '../lib/RechercheOFF'
+import { CAT_SCAN, chercherProduit, complet, garderProduit } from '../lib/openfoodfacts'
 import { unites } from '../lib/nutrition'
 
-const CAT_SCAN = 'Produits scannés'
 const CAT_PERSO = 'Mes aliments'
 const VIDE = { nom: '', marque: null, categorie: CAT_PERSO, kcal: null, proteines: null, glucides: null, lipides: null, unite_nom: null, unite_pluriel: null, unite_g: null }
 const pluriel = (m) => (/[sxz]$/i.test(m) ? m : m.split(' ').map((w, i) => (i === 0 ? `${w}s` : w)).join(' '))
@@ -17,7 +17,7 @@ export default function Aliments() {
   const { profil } = useSession()
   const [aliments, setAliments] = useState([])
   const [q, setQ] = useState('')
-  const [scan, setScan] = useState(null) // null | { etape: 'camera' | 'recherche' | 'produit' | 'existe' | 'inconnu' | 'saisie', ... }
+  const [scan, setScan] = useState(null) // null | { etape: 'camera' | 'off' | 'recherche' | 'produit' | 'existe' | 'inconnu' | 'saisie', ... }
   const dlg = useRef()
 
   const charger = () => supabase.from('aliments').select('*').order('categorie').order('nom').then(({ data }) => setAliments(data ?? []))
@@ -32,6 +32,7 @@ export default function Aliments() {
     return Object.entries(g).sort(([a], [b]) => rang(a) - rang(b))
   }, [aliments, q])
   const categories = useMemo(() => [...new Set([CAT_PERSO, ...aliments.map((a) => a.categorie)])].filter((c) => c !== CAT_SCAN), [aliments])
+  const codes = useMemo(() => new Set(aliments.map((a) => a.code_barres).filter(Boolean)), [aliments])
   const modifiable = (a) => a.cree_par === profil.id && a.source !== 'base'
 
   async function surCode(code) {
@@ -46,10 +47,15 @@ export default function Aliments() {
     }
   }
 
+  // Produit choisi dans la recherche par nom : même suite que pour un code-barres scanné
+  function surProduitOFF(p, terme) {
+    const deja = aliments.find((a) => a.code_barres === p.code_barres)
+    setScan(deja ? { etape: 'existe', code: p.code_barres, aliment: deja, depuis: 'off', terme } : { etape: 'produit', code: p.code_barres, aliment: p, depuis: 'off', terme })
+  }
+
   async function ajouter() {
     const a = scan.aliment
-    const { error } = await supabase.from('aliments').insert({ ...a, categorie: CAT_SCAN, source: 'Open Food Facts', cree_par: profil.id })
-    if (error) return toast(error.message)
+    try { await garderProduit(a, profil.id) } catch (e) { return toast(e.message) }
     toast(`${a.nom} ajouté à la bibliothèque`)
     dlg.current.close()
     setQ('')
@@ -91,10 +97,15 @@ export default function Aliments() {
         </div>
         <div className="row">
           <button className="btn ghost" onClick={() => saisir()}>Ajouter un aliment</button>
+          <button className="btn ghost" onClick={() => setScan({ etape: 'off', terme: q })}>Chercher un produit</button>
           <button className="btn" onClick={() => setScan({ etape: 'camera' })}>Scanner un article</button>
         </div>
       </div>
       <input type="search" placeholder="Rechercher un aliment ou une marque" value={q} onChange={(e) => setQ(e.target.value)} />
+      {q.trim().length >= 2 && (
+        <p className="sub">{groupes.length ? 'Pas le bon produit ?' : `« ${q.trim()} » n’est pas dans la bibliothèque.`}{' '}
+          <button className="linkbtn" onClick={() => setScan({ etape: 'off', terme: q })}>Chercher « {q.trim()} » dans Open Food Facts</button></p>
+      )}
       {groupes.map(([cat, liste]) => (
         <div key={cat} className="card">
           <h2>{cat}</h2>
@@ -116,22 +127,25 @@ export default function Aliments() {
           </div>
         </div>
       ))}
-      <p className="note">Les aliments scannés ou ajoutés à la main restent dans la bibliothèque et se retrouvent dans les plans alimentaires. Produits scannés : données <a href="https://fr.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> (licence ODbL).</p>
+      <p className="note">Les aliments scannés, trouvés dans Open Food Facts ou ajoutés à la main restent dans la bibliothèque et se retrouvent dans les plans alimentaires. Produits du commerce : données <a href="https://fr.openfoodfacts.org" target="_blank" rel="noreferrer">Open Food Facts</a> (licence ODbL).</p>
 
       <dialog ref={dlg} onClose={() => setScan(null)}>
         {scan && (
           <div className="dlg">
-            <div className="dlg-head"><h2>{scan.etape !== 'saisie' ? 'Scanner un article' : scan.aliment.id ? 'Modifier l’aliment' : 'Ajouter un aliment'}</h2>
+            <div className="dlg-head"><h2>{scan.etape === 'saisie' ? (scan.aliment.id ? 'Modifier l’aliment' : 'Ajouter un aliment') : scan.etape === 'off' || scan.depuis === 'off' ? 'Chercher un produit' : 'Scanner un article'}</h2>
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
 
             {scan.etape === 'camera' && <><p className="sub" style={{ margin: 0 }}>Vise le code-barres de l’emballage.</p><Scanner onCode={surCode} /></>}
+            {scan.etape === 'off' && <RechercheOFF terme={scan.terme} connus={codes} incompletOk libelle="Voir" onChoisir={surProduitOFF} />}
             {scan.etape === 'recherche' && <p className="sub">Recherche du produit {scan.code}…</p>}
 
             {scan.etape === 'existe' && (
               <div className="produit">
                 <p><strong>{scan.aliment.nom}</strong>{scan.aliment.marque && ` · ${scan.aliment.marque}`} est déjà dans la bibliothèque.</p>
                 <Macros a={scan.aliment} />
-                <div className="row"><button className="btn ghost" onClick={() => setScan({ etape: 'camera' })}>Scanner un autre article</button></div>
+                <div className="row">{scan.depuis === 'off'
+                  ? <button className="btn ghost" onClick={() => setScan({ etape: 'off', terme: scan.terme })}>Chercher un autre produit</button>
+                  : <button className="btn ghost" onClick={() => setScan({ etape: 'camera' })}>Scanner un autre article</button>}</div>
               </div>
             )}
 
@@ -157,7 +171,8 @@ export default function Aliments() {
                   ))}
                 </div>
                 {!complet(scan.aliment) && <p className="err">Il manque des valeurs : complète-les depuis l’emballage.</p>}
-                <div className="row"><button className="btn" disabled={!complet(scan.aliment)} onClick={ajouter}>Ajouter à la bibliothèque</button></div>
+                <div className="row"><button className="btn" disabled={!complet(scan.aliment)} onClick={ajouter}>Ajouter à la bibliothèque</button>
+                  {scan.depuis === 'off' && <button className="btn ghost" onClick={() => setScan({ etape: 'off', terme: scan.terme })}>Retour aux résultats</button>}</div>
               </div>
             )}
 
