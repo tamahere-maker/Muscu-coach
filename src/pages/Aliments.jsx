@@ -136,7 +136,7 @@ export default function Aliments() {
               <button className="icon-btn" aria-label="Fermer" onClick={() => dlg.current.close()}>×</button></div>
 
             {scan.etape === 'camera' && <><p className="sub" style={{ margin: 0 }}>Vise le code-barres de l’emballage.</p><Scanner onCode={surCode} /></>}
-            {scan.etape === 'off' && <RechercheOFF terme={scan.terme} connus={codes} incompletOk libelle="Voir" onChoisir={surProduitOFF} />}
+            {scan.etape === 'off' && <RechercheOFF terme={scan.terme} connus={codes} incompletOk libelle="Voir" msgIncomplet="Valeurs nutritionnelles incomplètes, à compléter" onChoisir={surProduitOFF} />}
             {scan.etape === 'recherche' && <p className="sub">Recherche du produit {scan.code}…</p>}
 
             {scan.etape === 'existe' && (
