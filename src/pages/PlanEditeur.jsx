@@ -268,7 +268,7 @@ export default function PlanEditeur() {
             </div>
             <div className="off-lien">
               {off
-                ? <RechercheOFF terme={q} connus={codes} libelle="Ajouter" onChoisir={choisirOFF} />
+                ? <RechercheOFF terme={q} connus={codes} libelle="Ajouter" msgIncomplet="Valeurs incomplètes : ajoute-le depuis Bibliothèque › Aliments pour les compléter" onChoisir={choisirOFF} />
                 : <button className="linkbtn" style={{ justifySelf: 'start' }} onClick={() => setOff(true)}>Produit du commerce ? Chercher {q.trim() ? `« ${q.trim()} » ` : ''}dans Open Food Facts</button>}
             </div>
           </div>

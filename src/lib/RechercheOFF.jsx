@@ -4,7 +4,7 @@ import { complet, rechercherProduits } from './openfoodfacts'
 
 // Recherche par nom dans Open Food Facts. onChoisir(produit, terme) reçoit une ligne prête pour la table aliments.
 // connus : codes-barres déjà dans la bibliothèque. incompletOk : un produit sans toutes ses valeurs peut être choisi.
-export default function RechercheOFF({ terme = '', onChoisir, connus, incompletOk = false, libelle = 'Choisir' }) {
+export default function RechercheOFF({ terme = '', onChoisir, connus, incompletOk = false, libelle = 'Choisir', msgIncomplet = 'Valeurs nutritionnelles incomplètes' }) {
   const [t, setT] = useState(terme)
   const [res, setRes] = useState(null) // { terme, produits, total, page }
   const [etat, setEtat] = useState(null) // null | 'charge' | message d'erreur
@@ -43,7 +43,7 @@ export default function RechercheOFF({ terme = '', onChoisir, connus, incompletO
                 <span><strong>{p.nom}</strong>{p.marque && <small className="sub"> · {p.marque}</small>}{p.quantite && <small className="sub"> · {p.quantite}</small>}<br />
                   <small className="sub">{ok
                     ? `${fmt(p.kcal)} kcal · P ${fmt(p.proteines, 1)} · G ${fmt(p.glucides, 1)} · L ${fmt(p.lipides, 1)} pour 100 g`
-                    : incompletOk ? 'Valeurs nutritionnelles incomplètes, à compléter' : 'Valeurs incomplètes : ajoute-le depuis Bibliothèque › Aliments pour les compléter'}</small></span>
+                    : msgIncomplet}</small></span>
                 <span className={`pill ${deja ? '' : 'acc'}`}>{deja ? 'Déjà là' : libelle}</span>
               </button>
             )

@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 import { fmt, jourIso, toast } from '../lib/ui'
 import { equivalent, macrosDe, quantite, resume, somme, substituts, unite } from '../lib/nutrition'
 import Quantite from '../lib/Quantite'
+import RechercheOFF from '../lib/RechercheOFF'
+import { garderProduit } from '../lib/openfoodfacts'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const decaler = (iso, n) => { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate() + n); return jourIso(d) }
@@ -21,6 +23,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const [prises, setPrises] = useState(null) // complement_id → true
   const [choix, setChoix] = useState(null) // ligne du plan dont on change l'aliment
   const [q, setQ] = useState('')
+  const [off, setOff] = useState(false) // recherche Open Food Facts ouverte dans « Remplacer »
   const [semaine, setSemaine] = useState(null) // journal des 7 derniers jours
   const dlg = useRef()
 
@@ -28,7 +31,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
     supabase.from('plans_nutrition')
       .select('id, nom, description, kcal, proteines, glucides, lipides, repas(id, ordre, nom, note, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite)), complements(id, nom, dose, moment)')
       .eq('athlete_id', aid).eq('actif', true).maybeSingle().then(({ data }) => setPlan(data))
-    supabase.from('aliments').select('id, categorie, nom, marque, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
+    supabase.from('aliments').select('id, categorie, nom, marque, code_barres, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
   }, [aid])
 
@@ -45,6 +48,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
       .then(({ data }) => setSemaine(data ?? []))
   }, [aid, journal])
 
+  const codes = useMemo(() => new Set(aliments.map((a) => a.code_barres).filter(Boolean)), [aliments])
   const alim = useMemo(() => Object.fromEntries(aliments.map((a) => [a.id, a])), [aliments])
   const resultats = useMemo(() => {
     const t = sansAccent(q.trim())
@@ -91,7 +95,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   // Nouvelle quantité : comptée comme mangée ; nouvelle unité : seulement l'affichage
   const changerQuantite = (l, champs) => ecrire([{ l, patch: champs.grammes ? { grammes: champs.grammes, confirme: true } : champs }])
 
-  function ouvrir(l) { setChoix(l); setQ(''); dlg.current.showModal() }
+  function ouvrir(l) { setChoix(l); setQ(''); setOff(false); dlg.current.showModal() }
   function choisir(a) {
     const l = choix, prevu = alim[l.aliment_id]
     const patch = a.id === l.aliment_id ? { aliment_id: null, grammes: null, unite: null, confirme: true }
@@ -99,6 +103,16 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
     ecrire([{ l, patch }])
     dlg.current.close()
     toast(a.id === l.aliment_id ? `${prevu.nom} rétabli` : `${prevu.nom} remplacé par ${a.nom}`)
+  }
+
+  // Produit du commerce trouvé dans Open Food Facts : gardé dans la bibliothèque (partagé, donc visible du coach), puis choisi
+  async function choisirOFF(p) {
+    let a = aliments.find((x) => x.code_barres === p.code_barres)
+    if (!a) {
+      try { a = await garderProduit(p, profil.id) } catch (e) { return toast(e.message) }
+      setAliments((l) => [...l, a])
+    }
+    choisir(a)
   }
 
   async function basculerPrise(c) {
@@ -229,6 +243,11 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
               {q && !resultats.length && <p className="empty">Aucun aliment trouvé.</p>}
             </div>
             <input type="search" placeholder="Ou cherche un autre aliment" value={q} onChange={(x) => setQ(x.target.value)} />
+            <div className="off-lien">
+              {off
+                ? <RechercheOFF terme={q} connus={codes} libelle="Choisir" msgIncomplet="Valeurs nutritionnelles incomplètes, choisis un autre produit" onChoisir={choisirOFF} />
+                : <button className="linkbtn" style={{ justifySelf: 'start' }} onClick={() => setOff(true)}>Produit du commerce ? Chercher {q.trim() ? `« ${q.trim()} » ` : ''}dans Open Food Facts</button>}
+            </div>
           </div>
         )}
       </dialog>
