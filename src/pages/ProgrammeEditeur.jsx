@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { Anim, toast } from '../lib/ui'
 import { blocs } from '../lib/supersets'
 import NouvelExercice from '../lib/NouvelExercice'
+import { JOURS_SEMAINE } from '../lib/jours'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const CHAMPS_EX = [['series', 'Séries', 1], ['reps', 'Reps', 1], ['charge_kg', 'Charge (kg)', 0.5], ['repos_s', 'Repos (s)', 15]]
@@ -29,7 +30,7 @@ export default function ProgrammeEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('programmes')
-      .select('id, nom, description, prix_eur, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe))')
+      .select('id, nom, description, prix_eur, jours_entrainement, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe))')
       .eq('id', id).single()
     if (!data) return
     setProg(data)
@@ -167,6 +168,15 @@ export default function ProgrammeEditeur() {
         <label className="field"><span className="label">Description</span>
           <input type="text" defaultValue={prog.description} placeholder="Ex. Prise de masse, 4 séances par semaine"
             onBlur={(e) => e.target.value !== prog.description && majProg({ description: e.target.value })} /></label>
+        <span className="label">Jours d’entraînement</span>
+        <div className="chips" role="group" aria-label="Jours d’entraînement">
+          {JOURS_SEMAINE.map(([n, l]) => {
+            const on = (prog.jours_entrainement ?? []).includes(n)
+            return <button key={n} type="button" className="chip" aria-pressed={on}
+              onClick={() => majProg({ jours_entrainement: on ? prog.jours_entrainement.filter((x) => x !== n) : [...(prog.jours_entrainement ?? []), n].sort() })}>{l}</button>
+          })}
+        </div>
+        <p className="sub" style={{ margin: 0 }}>Sert au plan alimentaire : les autres jours sont des jours de repos. Sans jour choisi, un jour avec une séance faite compte comme jour d’entraînement.</p>
       </div>
 
       {seances.map((s, i) => (

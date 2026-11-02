@@ -28,6 +28,7 @@ import { deconnexion, rafraichirPush } from './lib/push'
 import { useNonLus } from './lib/Messages'
 import NouveauMotDePasse from './pages/NouveauMotDePasse'
 import { BandeauxPwa } from './lib/pwa'
+import ListeCourses from './pages/ListeCourses'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
 const MESSAGE_LIEN = LIEN_EMAIL_PARTIEL ? 'Lien accepté. Ouvre aussi celui envoyé à ton autre adresse pour finir le changement.'
@@ -72,13 +73,13 @@ export default function App() {
                 <NavLink to="/" end aria-label="Athlètes" title="Athlètes"><Icone nom="athletes" /><span className="lbl">Athlètes</span></NavLink>
                 <NavLink to="/programmes" aria-label="Programmes" title="Programmes"><Icone nom="programmes" /><span className="lbl">Programmes</span></NavLink>
                 <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
-                <NavLink to="/exercices" className={() => (/^\/(exercices|aliments)/.test(location.pathname) ? 'active' : undefined)} aria-label="Bibliothèque" title="Bibliothèque"><Icone nom="bibliotheque" /><span className="lbl">Bibliothèque</span></NavLink>
+                <NavLink to="/exercices" className={() => (/^\/(exercices|aliments|recettes)/.test(location.pathname) ? 'active' : undefined)} aria-label="Bibliothèque" title="Bibliothèque"><Icone nom="bibliotheque" /><span className="lbl">Bibliothèque</span></NavLink>
                 <NavLink to="/messages" aria-label={totalNonLus > 0 ? `Messages, ${totalNonLus} non lus` : 'Messages'} title="Messages"><Icone nom="messages" /><span className="lbl">Messages</span>{totalNonLus > 0 && !location.pathname.startsWith('/messages') && <span className="badge" aria-hidden="true">{totalNonLus}</span>}</NavLink>
               </>
             ) : (
               <>
                 <NavLink to="/" className={({ isActive }) => (isActive || /^\/(seance|progres)/.test(location.pathname) ? 'active' : undefined)} end aria-label="Entraînement" title="Entraînement"><Icone nom="entrainement" /><span className="lbl">Entraînement</span></NavLink>
-                <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
+                <NavLink to="/nutrition" className={({ isActive }) => (isActive || location.pathname === "/courses" ? "active" : undefined)} aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
                 <NavLink to="/messages" aria-label={nonLus[profil.id] > 0 ? `Messages, ${nonLus[profil.id]} non lus` : 'Messages'} title="Messages"><Icone nom="messages" /><span className="lbl">Messages</span>{nonLus[profil.id] > 0 && location.pathname !== '/messages' && <span className="badge" aria-hidden="true">{nonLus[profil.id]}</span>}</NavLink>
               </>
             )}
@@ -114,6 +115,8 @@ export default function App() {
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
               {profil.role === 'coach' && <Route path="/exercices" element={<Bibliotheque vue="exercices" />} />}
               {profil.role === 'coach' && <Route path="/aliments" element={<Bibliotheque vue="aliments" />} />}
+              {profil.role === 'coach' && <Route path="/recettes" element={<Bibliotheque vue="recettes" />} />}
+              {profil.role === 'athlete' && <Route path="/courses" element={<ListeCourses />} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </>
           )}
