@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
@@ -92,6 +93,14 @@ export default function MonCompte() {
         {err.mdp && <p className="err">{err.mdp}</p>}
         <div className="row"><button className="btn" disabled={occupe}>Changer le mot de passe</button></div>
       </form>
+
+      {profil.role === 'coach' && (
+        <div className="card">
+          <h2>Contrat avec mes athlètes</h2>
+          <p className="sub" style={{ margin: 0 }}>Tes informations légales et tes conditions, reprises dans chaque contrat que tu envoies.</p>
+          <div className="row"><Link className="btn ghost" to="/contrat-type">Mon contrat type</Link></div>
+        </div>
+      )}
 
       <CarteNotifications />
       <CarteApplication />

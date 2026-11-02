@@ -28,6 +28,8 @@ import { deconnexion, rafraichirPush } from './lib/push'
 import { useNonLus } from './lib/Messages'
 import NouveauMotDePasse from './pages/NouveauMotDePasse'
 import { BandeauxPwa } from './lib/pwa'
+import Contrat from './pages/Contrat'
+import ContratModele from './pages/ContratModele'
 import ListeCourses from './pages/ListeCourses'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
@@ -112,6 +114,8 @@ export default function App() {
               {profil.role === 'athlete' && <Route path="/bilan/:id" element={<BilanFormulaire />} />}
               <Route path="/bilans/:id" element={<BilanDetail />} />
               <Route path="/compte" element={<MonCompte />} />
+              <Route path="/contrats/:id" element={<Contrat />} />
+              {profil.role === 'coach' && <Route path="/contrat-type" element={<ContratModele />} />}
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
               {profil.role === 'coach' && <Route path="/exercices" element={<Bibliotheque vue="exercices" />} />}
               {profil.role === 'coach' && <Route path="/aliments" element={<Bibliotheque vue="aliments" />} />}

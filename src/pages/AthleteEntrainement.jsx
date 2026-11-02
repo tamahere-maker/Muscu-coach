@@ -15,6 +15,7 @@ export default function AthleteEntrainement() {
   const [faites, setFaites] = useState(null)
   const [bilans, setBilans] = useState(null)
   const [suivi, setSuivi] = useState(null)
+  const [contrat, setContrat] = useState(undefined)
   const enCours = lireEnCours()
 
   useEffect(() => {
@@ -25,10 +26,23 @@ export default function AthleteEntrainement() {
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => setFaites(data ?? []))
     supabase.from('bilans').select('id, type, statut, created_at, envoye_at').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
+    // Contrat envoyé par le coach et pas encore accepté : les séances restent masquées jusqu'à l'acceptation
+    supabase.from('contrats').select('id, titre, coach:profiles!contrats_coach_id_fkey(nom)').eq('athlete_id', profil.id).eq('statut', 'envoye')
+      .order('created_at', { ascending: false }).limit(1).then(({ data, error }) => setContrat(error ? null : data?.[0] ?? null))
     supabase.from('suivi_bilans').select('jour_semaine').eq('athlete_id', profil.id).maybeSingle().then(({ data }) => setSuivi(data))
   }, [profil.id])
 
-  if (coachs === null || prog === undefined || faites === null || bilans === null) return null
+  if (coachs === null || prog === undefined || faites === null || bilans === null || contrat === undefined) return null
+  if (contrat) return (
+    <>
+      <div><h1>Bonjour {profil.nom}</h1>
+        <p className="sub">Avant de commencer, lis et accepte le contrat de coaching proposé par {contrat.coach?.nom || 'ton coach'}.</p></div>
+      <Link className="card a-faire" to={`/contrats/${contrat.id}`}>
+        <strong>Contrat à accepter : {contrat.titre}</strong>
+        <span className="sub">Prix, durée, rétractation et données personnelles : tout est expliqué. Tes séances s’afficheront ensuite.</span>
+      </Link>
+    </>
+  )
   const aFaire = coachs.length ? bilansAFaire(bilans, suivi) : []
   const seances = prog ? [...prog.seances].sort((a, b) => a.ordre - b.ordre) : []
   const derniere = (id) => faites.find((f) => f.seance_id === id)

@@ -5,9 +5,10 @@ import Progres from '../lib/Progres'
 import AthleteBilans from './AthleteBilans'
 import AthleteNutrition from './AthleteNutrition'
 import AthleteCoachs from './AthleteCoachs'
+import AthleteContrat from './AthleteContrat'
 import Conversation from '../lib/Messages'
 
-const VUES = [['seances', 'Séances'], ['nutrition', 'Nutrition'], ['bilans', 'Bilans'], ['messages', 'Messages'], ['coachs', 'Coachs']]
+const VUES = [['seances', 'Séances'], ['nutrition', 'Nutrition'], ['bilans', 'Bilans'], ['messages', 'Messages'], ['coachs', 'Coachs'], ['contrat', 'Contrat']]
 
 // Suivi d'un athlète par son coach : séances faites et statistiques, repas confirmés, bilans
 export default function AthleteSuivi() {
@@ -43,6 +44,7 @@ export default function AthleteSuivi() {
       {vue === 'nutrition' && <AthleteNutrition athleteId={id} lecture />}
       {vue === 'bilans' && <AthleteBilans id={id} />}
       {vue === 'messages' && <Conversation athleteId={id} />}
+      {vue === 'contrat' && <AthleteContrat id={id} nom={athlete.nom} programme={actifs.prog} />}
       {vue === 'coachs' && <AthleteCoachs id={id} prix={actifs.prog?.prix_eur} />}
     </>
   )

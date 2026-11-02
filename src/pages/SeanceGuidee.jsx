@@ -24,6 +24,12 @@ export default function SeanceGuidee() {
   const [envoi, setEnvoi] = useState(false)
   const dlg = useRef()
 
+  // Séances accessibles seulement une fois le contrat en attente accepté
+  useEffect(() => {
+    supabase.from('contrats').select('id').eq('athlete_id', profil.id).eq('statut', 'envoye').limit(1)
+      .then(({ data }) => { if (data?.length) nav(`/contrats/${data[0].id}`, { replace: true }) })
+  }, [profil.id])
+
   useEffect(() => {
     supabase.from('seances').select(`id, nom, note, programme:programmes(nom), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(${CHAMPS_EX}))`)
       .eq('id', id).maybeSingle().then(({ data }) => setS(data && { ...data, lignes: [...data.seance_exercices].sort((a, b) => a.ordre - b.ordre) }))

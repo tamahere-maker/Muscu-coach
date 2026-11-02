@@ -357,3 +357,18 @@ nav.tabs .ico{flex:none}
 .eau .bar i{display:block;height:100%}
 .m-eau{background:var(--gluc)}
 .courses .pris{text-decoration:line-through;color:var(--muted)}
+/* Contrat coach-athlète */
+.contrat-texte{display:grid;gap:6px;line-height:1.5}
+.contrat-texte h2{margin:0 0 4px}
+.contrat-texte h3{margin:12px 0 0;font-size:15px}
+.contrat-texte p{margin:0}
+.contrat-texte .puce{padding-left:14px;position:relative}
+.contrat-texte .puce::before{content:"•";position:absolute;left:2px}
+.coche{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:start;cursor:pointer}
+.coche input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--accent)}
+.coche em{color:var(--muted);font-style:normal;font-size:13px}
+@media print{
+  header.top,nav.tabs,.no-print,.toast{display:none!important}
+  body{background:#fff;color:#000}
+  .card{border:0;padding:0;background:none}
+}
