@@ -4,6 +4,7 @@ import { TYPES, dateFr } from '../lib/bilans'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
+import { STATUTS } from '../lib/contrat'
 import { MATERIEL, NIVEAUX, OBJECTIFS } from '../lib/listes'
 
 // Profil de l'athlète : ses coachs, ses bilans envoyés et les infos utiles au coach
@@ -12,12 +13,15 @@ export default function AthleteProfil() {
   const [coachs, setCoachs] = useState(null)
   const [f, setF] = useState(null)
   const [bilans, setBilans] = useState(null)
+  const [contrats, setContrats] = useState([])
 
   useEffect(() => {
     supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     supabase.from('bilans').select('id, type, statut, created_at, envoye_at, reponse_coach').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
+    supabase.from('contrats').select('id, titre, statut, created_at, accepte_at').eq('athlete_id', profil.id)
+      .order('created_at', { ascending: false }).then(({ data }) => setContrats(data ?? []))
     supabase.from('athlete_profiles').select('*').eq('athlete_id', profil.id).single().then(({ data }) => setF(data))
   }, [profil.id])
 
@@ -44,6 +48,20 @@ export default function AthleteProfil() {
           : 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'}</p>
         <p className="sub"><Link className="linkbtn" to="/compte">Mon compte : e-mail et mot de passe</Link></p>
       </div>
+
+      {contrats.length > 0 && (
+        <div className="card">
+          <h2>Mes contrats</h2>
+          <div className="liste">
+            {contrats.map((c) => (
+              <div key={c.id}>
+                <span>{c.titre} · {dateFr(c.accepte_at || c.created_at)} <span className={`pill ${STATUTS[c.statut][1]}`}>{STATUTS[c.statut][0]}</span></span>
+                <Link className="btn ghost sm" to={`/contrats/${c.id}`}>{c.statut === 'envoye' ? 'Lire et accepter' : 'Voir'}</Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {envoyes.length > 0 && (
         <div className="card">
