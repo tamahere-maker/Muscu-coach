@@ -44,7 +44,7 @@ export default function PlanEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, athlete_id, athlete:profiles!plans_nutrition_athlete_id_fkey(nom, athlete_profiles(sexe, poids_kg, taille_cm, age, seances_semaine)), repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(*)')
       .eq('id', id).single()
     if (!data) return
     setPlan(data)
@@ -321,9 +321,13 @@ export default function PlanEditeur() {
               <label key={k} className="field"><span className="label">{lib}</span>
                 <input type="text" defaultValue={c[k]} placeholder={ph} onBlur={(e) => e.target.value !== c[k] && maj('complements', c, { [k]: e.target.value })} /></label>
             ))}
+            <label className="field"><span className="label">Rappel</span>
+              <input type="time" defaultValue={c.heure?.slice(0, 5) ?? ''} title="Heure de prise : l’athlète reçoit une notification s’il n’a pas coché « pris »"
+                onBlur={(e) => (e.target.value || null) !== (c.heure?.slice(0, 5) ?? null) && maj('complements', c, { heure: e.target.value || null })} /></label>
             <button className="icon-btn" aria-label={`Retirer ${c.nom}`} onClick={async () => { await supabase.from('complements').delete().eq('id', c.id); charger() }}>×</button>
           </div>
         ))}
+        {complements.length > 0 && <p className="sub" style={{ margin: 0 }}>Avec une heure de rappel, l’athlète reçoit une notification s’il n’a pas encore coché « pris » (notifications activées sur son téléphone).</p>}
         <div className="row"><button className="btn ghost sm" onClick={ajouterComplement}>+ Ajouter un complément</button></div>
       </div>
 

@@ -7,6 +7,7 @@ import { equivalent, macrosDe, quantite, resume, somme, substituts, unite } from
 import Quantite from '../lib/Quantite'
 import RechercheOFF from '../lib/RechercheOFF'
 import { garderProduit } from '../lib/openfoodfacts'
+import { activerPush, useEtatPush } from '../lib/push'
 import { TYPES_JOUR, chargerCalendrier, decaler, objectifs, repasDuJour, typeDuJour } from '../lib/jours'
 
 const sansAccent = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -29,21 +30,30 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const [cal, setCal] = useState(null) // jours d'entraînement, séances faites, choix de l'athlète
   const [eau, setEau] = useState(null) // ml bus le jour affiché
   const dlg = useRef()
+  const [etatPush, relirePush] = useEtatPush()
 
   useEffect(() => {
     supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(id, nom, dose, moment)')
+      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(*)')
       .eq('athlete_id', aid).eq('actif', true).maybeSingle().then(({ data }) => setPlan(data))
     supabase.from('aliments').select('id, categorie, nom, marque, code_barres, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
   }, [aid])
 
+  // Fuseau horaire de l'appareil : les rappels de compléments partent à l'heure locale de l'athlète
+  useEffect(() => {
+    if (lecture) return
+    let fuseau
+    try { fuseau = Intl.DateTimeFormat().resolvedOptions().timeZone } catch { return }
+    if (fuseau) supabase.from('athlete_profiles').update({ fuseau }).eq('athlete_id', aid).neq('fuseau', fuseau).then(() => {})
+  }, [aid, lecture])
+
   useEffect(() => {
     setJournal(null); setPrises(null)
     supabase.from('journal_aliments').select('repas_aliment_id, aliment_id, grammes, unite, confirme').eq('athlete_id', aid).eq('date', jour)
       .then(({ data }) => setJournal(Object.fromEntries((data ?? []).map((j) => [j.repas_aliment_id, j]))))
-    supabase.from('prises_complements').select('complement_id').eq('athlete_id', aid).eq('date', jour)
-      .then(({ data }) => setPrises(Object.fromEntries((data ?? []).map((p) => [p.complement_id, true]))))
+    supabase.from('prises_complements').select('*').eq('athlete_id', aid).eq('date', jour)
+      .then(({ data }) => setPrises(Object.fromEntries((data ?? []).map((p) => [p.complement_id, p.pris_a ?? true]))))
     setEau(null)
     supabase.from('hydratation').select('ml').eq('athlete_id', aid).eq('date', jour).maybeSingle()
       .then(({ data }) => setEau(data?.ml ?? 0))
@@ -146,7 +156,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
 
   async function basculerPrise(c) {
     const avait = prises[c.id]
-    setPrises((p) => ({ ...p, [c.id]: !avait }))
+    setPrises((p) => ({ ...p, [c.id]: avait ? false : new Date().toISOString() }))
     const req = avait
       ? supabase.from('prises_complements').delete().eq('athlete_id', aid).eq('complement_id', c.id).eq('date', jour)
       : supabase.from('prises_complements').insert({ athlete_id: aid, complement_id: c.id, date: jour })
@@ -226,12 +236,27 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
         {plan.complements.length > 0 && (
           <div className="card">
             <h2>Compléments</h2>
-            {plan.complements.map((c) => (
-              <label key={c.id} className="check">
-                <input type="checkbox" checked={!!prises[c.id]} disabled={lecture} onChange={() => basculerPrise(c)} />
-                <span><strong>{c.nom}</strong>{c.dose && ` · ${c.dose}`}{c.moment && <><br /><span className="sub">{c.moment}</span></>}</span>
-              </label>
-            ))}
+            {[...plan.complements].sort((a, b) => (a.heure ?? '99').localeCompare(b.heure ?? '99')).map((c) => {
+              const pris = prises[c.id], h = c.heure?.slice(0, 5)
+              const enRetard = !pris && h && jour === jourIso() && new Date().toTimeString().slice(0, 5) >= h
+              return (
+                <label key={c.id} className="check">
+                  <input type="checkbox" checked={!!pris} disabled={lecture} onChange={() => basculerPrise(c)} />
+                  <span><strong>{c.nom}</strong>{c.dose && ` · ${c.dose}`}
+                    {(h || c.moment) && <><br /><span className="sub">{h && <span className={enRetard ? 'heure-retard' : undefined}>⏰ {h}</span>}{h && c.moment && ' · '}{c.moment}</span></>}
+                    {typeof pris === 'string' && <><br /><span className="sub">Pris à {new Date(pris).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span></>}
+                  </span>
+                </label>
+              )
+            })}
+            {!lecture && plan.complements.some((c) => c.heure) && ['inactif', 'ios'].includes(etatPush) && (
+              <div className="bandeau-carte">
+                <span>{etatPush === 'ios'
+                  ? <>Pour recevoir les rappels de compléments sur iPhone, installe d’abord l’app : dans Safari, <b>Partager</b> puis <b>Sur l’écran d’accueil</b>.</>
+                  : 'Active les notifications pour recevoir un rappel à l’heure de tes compléments.'}</span>
+                {etatPush === 'inactif' && <button className="btn sm" onClick={() => activerPush().then(() => toast('Notifications activées'), (e) => toast(e.message)).finally(relirePush)}>Activer</button>}
+              </div>
+            )}
           </div>
         )}
       </div>
