@@ -6,6 +6,7 @@ import { fmt, toast } from '../lib/ui'
 import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
 import { useNonLus } from '../lib/Messages'
 import TableauDeBord from '../lib/TableauDeBord'
+import { useDecroches } from '../lib/decroches'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -18,6 +19,7 @@ export default function CoachAthletes() {
   const [nouveau, setNouveau] = useState(null)
   const [err, setErr] = useState('')
   const nonLus = useNonLus()
+  const decroches = useDecroches(profil.id)
 
   async function charger() {
     const [c, i] = await Promise.all([
@@ -57,7 +59,7 @@ export default function CoachAthletes() {
         <p className="sub">Invite un athlète avec son e-mail, puis envoie-lui le lien.</p>
       </div>
 
-      <TableauDeBord nonLus={nonLus} />
+      <TableauDeBord nonLus={nonLus} decroches={decroches} />
 
       <form className="card" onSubmit={inviter}>
         <h2>Inviter un athlète</h2>
@@ -96,7 +98,7 @@ export default function CoachAthletes() {
         <h2>Athlètes suivis</h2>
         {suivis === null ? null : suivis.length === 0 ? <p className="empty">Aucun athlète pour l’instant.</p> : (
           <div className="liste">
-            {suivis.map((s) => {
+            {[...suivis].sort((x, y) => (decroches?.[y.athlete.id]?.gravite ?? 0) - (decroches?.[x.athlete.id]?.gravite ?? 0)).map((s) => {
               const p = s.athlete.athlete_profiles ?? {}
               const prog = s.athlete.programmes?.find((x) => x.actif)
               const plan = s.athlete.plans_nutrition?.find((x) => x.actif)
@@ -104,7 +106,8 @@ export default function CoachAthletes() {
               return (
                 <div key={s.id}>
                   <div className="athlete">
-                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">Coach associé · {s.perimetre}</span>}</strong>
+                    <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">Coach associé · {s.perimetre}</span>}
+                      {decroches?.[s.athlete.id]?.raisons.length > 0 && <span className="pill warn">À relancer</span>}</strong>
                     <span className="sub">
                       {[p.niveau, p.objectifs?.join(', '), p.seances_semaine && `${p.seances_semaine} séances/sem.`, p.duree_min && `${p.duree_min} min`]
                         .filter(Boolean).join(' · ') || 'Profil pas encore rempli'}

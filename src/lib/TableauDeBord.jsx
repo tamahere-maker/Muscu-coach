@@ -7,7 +7,7 @@ const joursDepuis = (iso) => Math.round((Date.now() - new Date(iso + 'T12:00')) 
 const dateCourte = (iso) => new Date(iso + 'T12:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
 // Vue d'ensemble du coach : chiffres de la semaine et athlètes qui demandent une action
-export default function TableauDeBord({ nonLus }) {
+export default function TableauDeBord({ nonLus, decroches }) {
   const [lignes, setLignes] = useState(null)
   useEffect(() => { supabase.rpc('tableau_de_bord').then(({ data }) => setLignes(data ?? [])) }, [])
   if (!lignes || lignes.length === 0) return null
@@ -18,8 +18,9 @@ export default function TableauDeBord({ nonLus }) {
     const nm = a.nom || 'Sans nom'
     if (nonLus[a.athlete_id]) alertes.push({ cle: a.athlete_id + 'm', lien: `/messages/${a.athlete_id}`, ton: 'acc', texte: `${nm} : ${nonLus[a.athlete_id]} message${nonLus[a.athlete_id] > 1 ? 's' : ''} non lu${nonLus[a.athlete_id] > 1 ? 's' : ''}` })
     if (a.bilans_a_lire > 0) alertes.push({ cle: a.athlete_id + 'b', lien: lien('bilans'), ton: 'acc', texte: `${nm} : ${a.bilans_a_lire} bilan${a.bilans_a_lire > 1 ? 's' : ''} à lire` })
-    if (a.bilan_en_retard) alertes.push({ cle: a.athlete_id + 'r', lien: lien('bilans'), ton: 'warn', texte: `${nm} : bilan hebdomadaire en retard` })
-    if (!a.derniere_seance) alertes.push({ cle: a.athlete_id + 'i', lien: lien('seances'), ton: 'warn', texte: `${nm} : aucune séance enregistrée` })
+    // Athlète avec des jours d'entraînement prévus : séances manquées déjà comptées dans « À relancer »
+    if (decroches?.[a.athlete_id]?.joursPrevus) { /* rien de plus */ }
+    else if (!a.derniere_seance) alertes.push({ cle: a.athlete_id + 'i', lien: lien('seances'), ton: 'warn', texte: `${nm} : aucune séance enregistrée` })
     else if (joursDepuis(a.derniere_seance) >= 7) alertes.push({ cle: a.athlete_id + 'i', lien: lien('seances'), ton: 'warn', texte: `${nm} : aucune séance depuis ${joursDepuis(a.derniere_seance)} jours` })
     else if (a.objectif_semaine && a.seances_7j < a.objectif_semaine) alertes.push({ cle: a.athlete_id + 'o', lien: lien('seances'), ton: '', texte: `${nm} : ${a.seances_7j} séance${a.seances_7j > 1 ? 's' : ''} sur ${a.objectif_semaine} prévues ces 7 derniers jours` })
     for (const r of a.records) alertes.push({ cle: a.athlete_id + r.exercice + r.date, lien: lien('seances'), ton: 'ok', texte: `${nm} : record au ${r.exercice}, ${fmt(r.kg, 1)} kg × ${r.reps} (${dateCourte(r.date)})` })
@@ -27,15 +28,38 @@ export default function TableauDeBord({ nonLus }) {
   const total = (k) => lignes.reduce((t, a) => t + Number(a[k]), 0)
   const actifs = lignes.filter((a) => a.seances_7j > 0).length
   const messages = Object.values(nonLus).reduce((t, n) => t + n, 0)
+  const relancer = lignes.filter((a) => decroches?.[a.athlete_id]?.raisons.length)
+    .sort((x, y) => decroches[y.athlete_id].gravite - decroches[x.athlete_id].gravite)
 
   return (
     <div className="card">
+      {relancer.length > 0 && (
+        <div className="relancer">
+          <h2>À relancer <span className="badge">{relancer.length}</span></h2>
+          <div className="liste alertes">
+            {relancer.map((a) => (
+              <div key={a.athlete_id}>
+                <span className="athlete">
+                  <strong><span className="point warn" aria-hidden="true" />{a.nom || 'Sans nom'}</strong>
+                  <span className="sub">{decroches[a.athlete_id].raisons.map((r) => r.texte).join(' · ')}
+                    {a.derniere_seance ? ` · dernière séance le ${dateCourte(a.derniere_seance)}` : ' · aucune séance enregistrée'}</span>
+                </span>
+                <span className="row">
+                  <Link className="btn sm" to={`/messages/${a.athlete_id}`}>Relancer</Link>
+                  <Link className="btn ghost sm" to={`/athletes/${a.athlete_id}?vue=${decroches[a.athlete_id].raisons[0].type === 'seances' ? 'seances' : 'bilans'}`}>Suivi</Link>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <h2>Cette semaine</h2>
       <div className="kpis">
         <div className="kpi"><span className="label">Athlètes actifs (7 j)</span><b className="num">{actifs} / {lignes.length}</b></div>
         <div className="kpi"><span className="label">Séances (7 j)</span><b className="num">{total('seances_7j')}</b></div>
         <div className="kpi"><span className="label">Bilans à lire</span><b className="num">{total('bilans_a_lire')}</b></div>
         <div className="kpi"><span className="label">Messages non lus</span><b className="num">{messages}</b></div>
+        <div className="kpi"><span className="label">À relancer</span><b className="num">{relancer.length}</b></div>
       </div>
       {alertes.length === 0
         ? <p className="empty">Rien à signaler : tous tes athlètes sont à jour.</p>
