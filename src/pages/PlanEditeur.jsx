@@ -321,13 +321,18 @@ export default function PlanEditeur() {
               <label key={k} className="field"><span className="label">{lib}</span>
                 <input type="text" defaultValue={c[k]} placeholder={ph} onBlur={(e) => e.target.value !== c[k] && maj('complements', c, { [k]: e.target.value })} /></label>
             ))}
-            <label className="field"><span className="label">Rappel</span>
-              <input type="time" defaultValue={c.heure?.slice(0, 5) ?? ''} title="Heure de prise : l’athlète reçoit une notification s’il n’a pas coché « pris »"
-                onBlur={(e) => (e.target.value || null) !== (c.heure?.slice(0, 5) ?? null) && maj('complements', c, { heure: e.target.value || null })} /></label>
+            {c.heure ? (
+              <label className="field"><span className="label">Horaire <button type="button" className="lien-mini" onClick={() => maj('complements', c, { heure: null })}>retirer</button></span>
+                <input type="time" key={c.heure} defaultValue={c.heure.slice(0, 5)} title="Heure de prise : l’athlète reçoit une notification s’il n’a pas coché « pris »"
+                  onBlur={(e) => e.target.value && e.target.value !== c.heure.slice(0, 5) && maj('complements', c, { heure: e.target.value })} /></label>
+            ) : (
+              <div className="field"><span className="label">Horaire (facultatif)</span>
+                <button type="button" className="btn ghost sm" onClick={() => maj('complements', c, { heure: '08:00' })}>⏰ Ajouter</button></div>
+            )}
             <button className="icon-btn" aria-label={`Retirer ${c.nom}`} onClick={async () => { await supabase.from('complements').delete().eq('id', c.id); charger() }}>×</button>
           </div>
         ))}
-        {complements.length > 0 && <p className="sub" style={{ margin: 0 }}>Avec une heure de rappel, l’athlète reçoit une notification s’il n’a pas encore coché « pris » (notifications activées sur son téléphone).</p>}
+        {complements.length > 0 && <p className="sub" style={{ margin: 0 }}>L’horaire est facultatif. S’il est renseigné, l’athlète reçoit une notification s’il n’a pas encore coché « pris » (notifications activées sur son téléphone).</p>}
         <div className="row"><button className="btn ghost sm" onClick={ajouterComplement}>+ Ajouter un complément</button></div>
       </div>
 

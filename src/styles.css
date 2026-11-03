@@ -198,7 +198,7 @@ nav.tabs a.active{color:var(--ink);border-bottom-color:var(--accent)}
 .plan-ligne .qte{width:80px}
 .macros-ligne{margin-left:auto;text-align:right;font-size:12px}
 .plan-ligne .chip .linkbtn{text-decoration:none;font-size:15px;line-height:1}
-.complement{display:grid;grid-template-columns:1.4fr 1fr 1fr 110px auto;gap:8px;align-items:end}
+.complement{display:grid;grid-template-columns:1.4fr 1fr 1fr 120px auto;gap:8px;align-items:end}
 @media (max-width:480px){.complement{grid-template-columns:1fr 1fr}.complement .field:first-child{grid-column:1/-1}.complement .icon-btn{justify-self:end}}
 .pick-aliment{grid-template-columns:1fr auto}
 .macros4 .ecart b{color:var(--warn)}
@@ -401,3 +401,4 @@ nav.tabs .ico{flex:none}
 .adherence .num.ok,.adherence td.ok{color:var(--ok)}
 .adherence .num.warn,.adherence td.warn{color:var(--warn)}
 .ecarts-macros{display:flex;flex-wrap:wrap;gap:6px}
+.lien-mini{background:none;border:0;padding:0 0 0 6px;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
