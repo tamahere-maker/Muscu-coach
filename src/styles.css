@@ -388,3 +388,7 @@ nav.tabs .ico{flex:none}
 .var-liste{display:grid;gap:6px}
 .licence{font-size:12px}
 .video-ex summary{cursor:pointer;font-weight:600;color:var(--accent)}
+/* Athlètes à relancer, en tête du tableau de bord */
+.relancer{border-left:3px solid var(--warn);padding-left:12px;margin-bottom:18px}
+.relancer h2{display:flex;align-items:center}
+.relancer .athlete{display:flex;flex-direction:column;gap:2px;min-width:0}
