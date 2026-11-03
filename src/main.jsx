@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { SessionProvider } from './lib/session'
 import { demarrerPwa } from './lib/pwa'
+import { demarrerSynchro } from './lib/horsligne'
 import App from './App'
 import './styles.css'
 
 demarrerPwa()
+demarrerSynchro()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

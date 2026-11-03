@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { LIEN_RECUPERATION, supabase } from './supabase'
+import { LIEN_RECUPERATION, sessionGardee, supabase } from './supabase'
+import { associerUtilisateur } from './horsligne'
 
 const Ctx = createContext(null)
 
@@ -11,9 +12,13 @@ export function SessionProvider({ children }) {
   const [recuperation, setRecuperation] = useState(LIEN_RECUPERATION)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session))
+    // Sans réseau, une session expirée ne peut pas être renouvelée : on garde celle de l'appareil
+    // (les données viennent alors des copies gardées) au lieu de renvoyer vers la connexion.
+    const horsLigne = (s, e) => s ?? (e !== 'SIGNED_OUT' && !navigator.onLine ? sessionGardee() : null)
+    if (!navigator.onLine && sessionGardee()) setSession(sessionGardee())
+    supabase.auth.getSession().then(({ data }) => setSession(horsLigne(data.session)))
     const { data } = supabase.auth.onAuthStateChange((e, s) => {
-      setSession(s)
+      setSession(horsLigne(s, e))
       if (e === 'PASSWORD_RECOVERY') setRecuperation(true)
       if (e === 'SIGNED_OUT') setRecuperation(false)
     })
@@ -23,6 +28,7 @@ export function SessionProvider({ children }) {
   const uid = session?.user?.id
   useEffect(() => {
     if (!uid) { setProfil(null); return }
+    associerUtilisateur(uid)
     supabase.from('profiles').select('id, role, nom').eq('id', uid).single().then(({ data }) => setProfil(data))
   }, [uid])
 

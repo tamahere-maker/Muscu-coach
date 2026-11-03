@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
+import { chargerAliments, chargerEau, chargerJournal, chargerPlan, chargerPrises, chargerSemaine } from '../lib/chargements'
 import { fmt, jourIso, toast } from '../lib/ui'
 import { equivalent, macrosDe, quantite, resume, somme, substituts, unite } from '../lib/nutrition'
 import Quantite from '../lib/Quantite'
@@ -33,11 +34,8 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   const [etatPush, relirePush] = useEtatPush()
 
   useEffect(() => {
-    supabase.from('plans_nutrition')
-      .select('id, nom, description, kcal, proteines, glucides, lipides, jours_differents, kcal_repos, proteines_repos, glucides_repos, lipides_repos, eau_ml, repas(id, ordre, nom, note, type_jour, repas_aliments(id, ordre, aliment_id, grammes, alternatives, unite, recette)), complements(*)')
-      .eq('athlete_id', aid).eq('actif', true).maybeSingle().then(({ data }) => setPlan(data))
-    supabase.from('aliments').select('id, categorie, nom, marque, code_barres, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
-      .then(({ data }) => setAliments(data ?? []))
+    chargerPlan(aid).then(({ data }) => setPlan(data))
+    chargerAliments().then(({ data }) => setAliments(data ?? []))
   }, [aid])
 
   // Fuseau horaire de l'appareil : les rappels de compléments partent à l'heure locale de l'athlète
@@ -50,21 +48,17 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
 
   useEffect(() => {
     setJournal(null); setPrises(null)
-    supabase.from('journal_aliments').select('repas_aliment_id, aliment_id, grammes, unite, confirme').eq('athlete_id', aid).eq('date', jour)
-      .then(({ data }) => setJournal(Object.fromEntries((data ?? []).map((j) => [j.repas_aliment_id, j]))))
-    supabase.from('prises_complements').select('*').eq('athlete_id', aid).eq('date', jour)
-      .then(({ data }) => setPrises(Object.fromEntries((data ?? []).map((p) => [p.complement_id, p.pris_a ?? true]))))
+    chargerJournal(aid, jour).then(({ data }) => setJournal(Object.fromEntries((data ?? []).map((j) => [j.repas_aliment_id, j]))))
+    chargerPrises(aid, jour).then(({ data }) => setPrises(Object.fromEntries((data ?? []).map((p) => [p.complement_id, p.pris_a ?? true]))))
     setEau(null)
-    supabase.from('hydratation').select('ml').eq('athlete_id', aid).eq('date', jour).maybeSingle()
-      .then(({ data }) => setEau(data?.ml ?? 0))
+    chargerEau(aid, jour).then(({ data }) => setEau(data?.ml ?? 0))
   }, [aid, jour])
 
   const debutCal = jour < decaler(jourIso(), -6) ? jour : decaler(jourIso(), -6)
   useEffect(() => { chargerCalendrier(aid, debutCal, jourIso()).then(setCal) }, [aid, debutCal])
 
   useEffect(() => {
-    supabase.from('journal_aliments').select('date, repas_aliment_id, aliment_id, grammes, confirme').eq('athlete_id', aid).gte('date', decaler(jourIso(), -6))
-      .then(({ data }) => setSemaine(data ?? []))
+    chargerSemaine(aid).then(({ data }) => setSemaine(data ?? []))
   }, [aid, journal])
 
   const codes = useMemo(() => new Set(aliments.map((a) => a.code_barres).filter(Boolean)), [aliments])
@@ -159,7 +153,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
     setPrises((p) => ({ ...p, [c.id]: avait ? false : new Date().toISOString() }))
     const req = avait
       ? supabase.from('prises_complements').delete().eq('athlete_id', aid).eq('complement_id', c.id).eq('date', jour)
-      : supabase.from('prises_complements').insert({ athlete_id: aid, complement_id: c.id, date: jour })
+      : supabase.from('prises_complements').insert({ athlete_id: aid, complement_id: c.id, date: jour, pris_a: new Date().toISOString() })
     const { error } = await req
     if (error) { setPrises((p) => ({ ...p, [c.id]: avait })); toast(error.message) }
   }

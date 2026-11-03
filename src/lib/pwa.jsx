@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { enAttente, surChangement } from './horsligne'
+import { toast } from './ui'
 
 // État partagé de l'app installable : capturé dès le chargement, avant le montage de React
 let invite = null        // événement beforeinstallprompt gardé pour plus tard
@@ -47,6 +49,16 @@ function useEnLigne() {
   return enLigne
 }
 
+// Enregistrements faits sans réseau, pas encore envoyés
+function useAttente() {
+  const [n, setN] = useState(enAttente)
+  useEffect(() => surChangement((info) => {
+    setN(enAttente())
+    if (info.type === 'envoi' && info.echecs) toast(`${info.echecs} enregistrement${info.echecs > 1 ? 's' : ''} fait${info.echecs > 1 ? 's' : ''} sans réseau n’${info.echecs > 1 ? 'ont' : 'a'} pas pu être envoyé${info.echecs > 1 ? 's' : ''} (programme ou plan modifié entre-temps ?).`)
+  }), [])
+  return n
+}
+
 // Comment installer l'app sur cet appareil : 'bouton' (Android, Chrome, Edge), 'ios' (Safari, à la main) ou null
 export function useInstallation() {
   const { invite: inv } = useEtatPwa()
@@ -69,6 +81,7 @@ export function ConsigneIOS() {
 // Bandeaux sous l'en-tête : hors ligne, nouvelle version, proposition d'installer l'app
 export function BandeauxPwa({ connecte }) {
   const enLigne = useEnLigne()
+  const attente = useAttente()
   const { attente: sw } = useEtatPwa()
   const inst = useInstallation()
   const [masquee, setMasquee] = useState(lireMasquee)
@@ -76,7 +89,8 @@ export function BandeauxPwa({ connecte }) {
 
   return (
     <>
-      {!enLigne && <div className="bandeau warn" role="status"><span>Hors ligne : l’app a besoin du réseau pour charger et enregistrer tes données. Une séance en cours reste gardée sur cet appareil.</span></div>}
+      {!enLigne && <div className="bandeau warn" role="status"><span>Hors ligne : tes séances et ton plan alimentaire restent disponibles. Ce que tu enregistres est gardé sur cet appareil et sera envoyé au retour du réseau.</span></div>}
+      {enLigne && attente > 0 && <div className="bandeau" role="status"><span>Envoi de ce que tu as enregistré sans réseau…</span></div>}
       {sw && <div className="bandeau" role="status"><span>Une nouvelle version de l’app est disponible.</span><button className="btn sm" onClick={mettreAJour}>Mettre à jour</button></div>}
       {connecte && !sw && inst.mode && !masquee && (
         <div className="bandeau">

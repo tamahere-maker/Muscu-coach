@@ -1,5 +1,6 @@
 // Service worker de Muscu Coach : coquille de l'app disponible hors ligne.
-// Les données (Supabase) ne sont jamais mises en cache : elles passent toujours par le réseau.
+// Les données Supabase ne passent pas par ici : l'app garde elle-même ses copies hors ligne
+// (cache « donnees-… », voir src/lib/horsligne.js), que ce service worker ne doit pas effacer.
 // Remplacée à chaque build par vite.config.js (versionServiceWorker)
 const VERSION = 'dev'
 const COQUILLE = `coquille-${VERSION}`
@@ -19,7 +20,7 @@ self.addEventListener('install', (e) => {
 
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
-    for (const cle of await caches.keys()) if (cle !== COQUILLE && cle !== MEDIAS) await caches.delete(cle)
+    for (const cle of await caches.keys()) if (cle !== COQUILLE && cle !== MEDIAS && !cle.startsWith('donnees-')) await caches.delete(cle)
     await self.clients.claim()
   })())
 })
@@ -63,8 +64,8 @@ self.addEventListener('fetch', (e) => {
     return
   }
 
-  // Polices Google
-  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') e.respondWith(depuisCache(MEDIAS, req))
+  // Polices Google et images des exercices importés de wger.de (gardées pour la salle)
+  if (url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com' || url.hostname.endsWith('wger.de')) e.respondWith(depuisCache(MEDIAS, req))
 })
 
 // Notifications push des nouveaux messages (envoyées par la fonction Supabase « notifier »)

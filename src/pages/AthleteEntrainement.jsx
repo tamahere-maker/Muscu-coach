@@ -4,6 +4,7 @@ import { TYPES, bilansAFaire, dateFr } from '../lib/bilans'
 import { lireEnCours } from '../lib/seance'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
+import { chargerProgramme } from '../lib/chargements'
 
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`
 
@@ -20,8 +21,7 @@ export default function AthleteEntrainement() {
 
   useEffect(() => {
     supabase.from('coachings').select('id').eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
-    supabase.from('programmes').select('nom, description, seances(id, ordre, nom, note, seance_exercices(id, series))')
-      .eq('athlete_id', profil.id).eq('actif', true).maybeSingle().then(({ data }) => setProg(data))
+    chargerProgramme(profil.id).then(({ data }) => setProg(data))
     supabase.from('seances_realisees').select('id, seance_id, nom, date, series_realisees(id)').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => setFaites(data ?? []))
     supabase.from('bilans').select('id, type, statut, created_at, envoye_at').eq('athlete_id', profil.id)
