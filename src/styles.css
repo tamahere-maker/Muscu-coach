@@ -392,3 +392,11 @@ nav.tabs .ico{flex:none}
 .relancer{border-left:3px solid var(--warn);padding-left:12px;margin-bottom:18px}
 .relancer h2{display:flex;align-items:center}
 .relancer .athlete{display:flex;flex-direction:column;gap:2px;min-width:0}
+
+
+/* Adhérence nutrition (Suivi du coach) */
+.adherence h3{margin:6px 0 0;font-size:15px}
+.adherence .kpi .sub{display:block;font-size:12px}
+.adherence .num.ok,.adherence td.ok{color:var(--ok)}
+.adherence .num.warn,.adherence td.warn{color:var(--warn)}
+.ecarts-macros{display:flex;flex-wrap:wrap;gap:6px}
