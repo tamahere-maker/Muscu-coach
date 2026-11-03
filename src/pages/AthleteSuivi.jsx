@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import Progres from '../lib/Progres'
 import AthleteBilans from './AthleteBilans'
 import AthleteNutrition from './AthleteNutrition'
+import Adherence from '../lib/Adherence'
 import AthleteCoachs from './AthleteCoachs'
 import AthleteContrat from './AthleteContrat'
 import Conversation from '../lib/Messages'
@@ -41,6 +42,7 @@ export default function AthleteSuivi() {
       {vue === 'seances' && actifs.prog && <div className="row"><Link className="btn ghost sm" to={`/programmes/${actifs.prog.id}`}>Modifier son programme · {actifs.prog.nom}</Link></div>}
       {vue === 'nutrition' && actifs.plan && <div className="row"><Link className="btn ghost sm" to={`/nutrition/${actifs.plan.id}`}>Modifier son plan · {actifs.plan.nom}</Link></div>}
       {vue === 'seances' && <Progres athleteId={id} objectifSemaine={ap?.seances_semaine} />}
+      {vue === 'nutrition' && <Adherence athleteId={id} />}
       {vue === 'nutrition' && <AthleteNutrition athleteId={id} lecture />}
       {vue === 'bilans' && <AthleteBilans id={id} />}
       {vue === 'messages' && <Conversation athleteId={id} />}

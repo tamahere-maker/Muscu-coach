@@ -389,3 +389,10 @@ nav.tabs .ico{flex:none}
 .licence{font-size:12px}
 .video-ex summary{cursor:pointer;font-weight:600;color:var(--accent)}
 .heure-retard{color:var(--warn);font-weight:600}
+
+/* Adhérence nutrition (Suivi du coach) */
+.adherence h3{margin:6px 0 0;font-size:15px}
+.adherence .kpi .sub{display:block;font-size:12px}
+.adherence .num.ok,.adherence td.ok{color:var(--ok)}
+.adherence .num.warn,.adherence td.warn{color:var(--warn)}
+.ecarts-macros{display:flex;flex-wrap:wrap;gap:6px}
