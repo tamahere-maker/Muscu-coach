@@ -6,6 +6,7 @@ import { estInstallee } from './pwa'
 // Notifications push des nouveaux messages : abonnement de l'appareil, envoi via la fonction Supabase « notifier »
 
 const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+const estBrave = () => !!navigator.brave
 const supporte = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
 
 // Clé publique VAPID (base64url) → octets attendus par pushManager.subscribe
@@ -39,7 +40,16 @@ export async function activerPush() {
   if (!sub) {
     const { data, error } = await supabase.functions.invoke('notifier', { body: { action: 'cle' } })
     if (error || !data?.cle) throw new Error('Notifications indisponibles pour le moment')
-    sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: octets(data.cle) })
+    try {
+      sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: octets(data.cle) })
+    } catch (e) {
+      // « Registration failed - push service error » : le navigateur ne joint pas son service de notifications
+      // (Brave sans les services Google, VPN ou pare-feu, navigateur à relancer)
+      if (/push service/i.test(e?.message ?? '') || e?.name === 'AbortError') throw new Error(estBrave()
+        ? 'Brave bloque les notifications : active « Utiliser les services Google pour la messagerie push » dans brave://settings/privacy, relance Brave puis réessaie.'
+        : 'Le navigateur n’arrive pas à joindre son service de notifications. Désactive un éventuel VPN ou bloqueur, relance le navigateur puis réessaie.')
+      throw e
+    }
   }
   const { error } = await enregistrer(sub)
   if (error) throw error
