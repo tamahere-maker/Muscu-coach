@@ -1,3 +1,4 @@
+import { enAttente, viderHorsLigne } from './horsligne'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabase'
 import { estInstallee } from './pwa'
@@ -63,8 +64,11 @@ export const notifier = (ids) => supabase.functions.invoke('notifier', { body: {
 
 // Déconnexion : l'appareil cesse de recevoir les notifications du compte
 export async function deconnexion() {
+  if (enAttente() && !confirm('Ce que tu as enregistré sans réseau n’a pas encore été envoyé. Te déconnecter maintenant l’effacera de cet appareil. Continuer ?')) return
   await desactiverPush().catch(() => {})
   await supabase.auth.signOut()
+  // Copies gardées pour le mode hors ligne : effacées pour le prochain utilisateur de l'appareil
+  await viderHorsLigne()
 }
 
 export function useEtatPush() {

@@ -3,11 +3,12 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { etapes, garderEnCours, lireEnCours, remplacants } from '../lib/seance'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
-import { Anim, fmt, toast } from '../lib/ui'
+import { Anim, fmt, jourIso, toast } from '../lib/ui'
+import { CHAMPS_EX, chargerDerniers, chargerMateriel, chargerSeance, chargerVideos } from '../lib/chargements'
+import { enAttente } from '../lib/horsligne'
 import { EcrireAuCoach } from '../lib/Messages'
 import { Video, VideoCoach } from '../lib/VideoExercice'
 
-const CHAMPS_EX = 'id, nom, sprite, image_url, consigne, consigne_en, lien_video, licence, wger_id, muscles, materiel, categorie, force, mecanique, niveau, essentiel'
 const chrono = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`
 
@@ -27,10 +28,8 @@ export default function SeanceGuidee() {
   const dlg = useRef()
 
   useEffect(() => {
-    supabase.from('seances').select(`id, nom, note, programme:programmes(nom, coach_id), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(${CHAMPS_EX}))`)
-      .eq('id', id).maybeSingle().then(({ data }) => setS(data && { ...data, lignes: [...data.seance_exercices].sort((a, b) => a.ordre - b.ordre) }))
-    supabase.from('seances_realisees').select('date, series_realisees(exercice_id, ordre, reps, charge_kg)').eq('athlete_id', profil.id)
-      .order('created_at', { ascending: false }).limit(20).then(({ data }) => {
+    chargerSeance(id).then(({ data }) => setS(data && { ...data, lignes: [...data.seance_exercices].sort((a, b) => a.ordre - b.ordre) }))
+    chargerDerniers(profil.id).then(({ data }) => {
         const d = {}
         ;(data ?? []).forEach((r) => {
           const parEx = {}
@@ -39,15 +38,15 @@ export default function SeanceGuidee() {
         })
         setDerniers(d)
       })
-    supabase.from('athlete_profiles').select('materiel').eq('athlete_id', profil.id).maybeSingle().then(({ data }) => setMateriel(data?.materiel ?? []))
+    chargerMateriel(profil.id).then(({ data }) => setMateriel(data?.materiel ?? []))
   }, [id, profil.id])
 
   // Vidéos perso des coachs pour les exercices de la séance (et leurs remplaçants), celle du coach du programme d'abord
   const idsEx = s ? [...new Set([...s.lignes.map((l) => l.exercice.id), ...Object.values(run?.seance === id ? run.rempl : {}).map((x) => x.id)])] : []
-  const cleIds = idsEx.sort().join(',')
+  const cleIds = [...idsEx].sort().join(',')
   useEffect(() => {
     if (!idsEx.length) return
-    supabase.from('videos_exercices').select('coach_id, exercice_id, url, chemin, updated_at').in('exercice_id', idsEx).then(({ data }) => {
+    chargerVideos(idsEx).then(({ data }) => {
       const v = {}
       ;(data ?? []).sort((a, b) => (b.coach_id === s.programme?.coach_id) - (a.coach_id === s.programme?.coach_id))
         .forEach((x) => { v[x.exercice_id] ??= x })
@@ -187,26 +186,29 @@ export default function SeanceGuidee() {
     toast(x.id === l.exercice.id ? 'Exercice prévu rétabli' : `Remplacé par ${x.nom}`)
   }
 
+  // Sans réseau, la séance est gardée sur l'appareil et envoyée au retour du réseau (horsligne.js) :
+  // les identifiants sont créés ici pour qu'un nouvel envoi ne crée pas de doublon.
   async function terminer() {
     const lignesFaites = s.lignes.flatMap((li) => actif.sets[li.id].map((z, k) => ({ li, z, k })).filter(({ z }) => z.fait))
     if (!lignesFaites.length) { toast('Valide au moins une série avant de terminer.'); return }
     setEnvoi(true)
-    const { data: sr, error } = await supabase.from('seances_realisees').insert({ athlete_id: profil.id, seance_id: s.id, nom: s.nom }).select('id').single()
-    const horsLigne = 'Pas de réseau : ta séance reste gardée sur cet appareil, réessaie dès que tu as du réseau.'
-    if (error) { setEnvoi(false); toast(navigator.onLine ? error.message : horsLigne); return }
+    const srId = crypto.randomUUID()
+    const { error } = await supabase.from('seances_realisees').insert({ id: srId, athlete_id: profil.id, seance_id: s.id, nom: s.nom, date: jourIso(new Date(actif.debut)), created_at: new Date().toISOString() })
+    if (error) { setEnvoi(false); toast(error.message); return }
     const lignes = lignesFaites.map(({ li, z }, ordre) => {
       const x = exDe(li)
-      return { seance_realisee_id: sr.id, exercice_id: x.id, exercice_prevu_id: x.id === li.exercice.id ? null : li.exercice.id, ordre, reps: Number(z.reps) || 0, charge_kg: Number(z.kg) || 0 }
+      return { id: crypto.randomUUID(), seance_realisee_id: srId, exercice_id: x.id, exercice_prevu_id: x.id === li.exercice.id ? null : li.exercice.id, ordre, reps: Number(z.reps) || 0, charge_kg: Number(z.kg) || 0 }
     })
     const { error: e2 } = await supabase.from('series_realisees').insert(lignes)
     if (e2) {
       // Séance retirée pour éviter un doublon quand l'athlète réessaiera
-      await supabase.from('seances_realisees').delete().eq('id', sr.id)
-      setEnvoi(false); toast(navigator.onLine ? e2.message : horsLigne); return
+      await supabase.from('seances_realisees').delete().eq('id', srId)
+      setEnvoi(false); toast(e2.message); return
     }
     setEnvoi(false)
     garderEnCours(null); setRun(null)
-    toast(`Séance enregistrée · ${pluriel(lignes.length, 'série')}`)
+    toast(enAttente() ? `Séance gardée sur ton téléphone · ${pluriel(lignes.length, 'série')}. Elle sera envoyée à ton coach dès le retour du réseau.`
+      : `Séance enregistrée · ${pluriel(lignes.length, 'série')}`)
     nav('/')
   }
 
