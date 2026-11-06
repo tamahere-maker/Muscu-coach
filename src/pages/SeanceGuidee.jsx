@@ -17,6 +17,7 @@ export default function SeanceGuidee() {
   const { id } = useParams()
   const { profil } = useSession()
   const nav = useNavigate()
+  const accueil = profil.role === 'coach' ? '/moi' : '/'
   const [s, setS] = useState(null)
   const [derniers, setDerniers] = useState({}) // exercice_id → séries de la dernière fois
   const [materiel, setMateriel] = useState([])
@@ -101,7 +102,7 @@ export default function SeanceGuidee() {
     return (
       <>
         <div>
-          <Link className="linkbtn" to="/">‹ Mes séances</Link>
+          <Link className="linkbtn" to={accueil}>‹ Mes séances</Link>
           <h1>{s.nom}</h1>
           <p className="sub">{s.programme?.nom} · {pluriel(s.lignes.length, 'exercice')} · {pluriel(total, 'série')}</p>
         </div>
@@ -231,7 +232,7 @@ export default function SeanceGuidee() {
     garderEnCours(null); setRun(null)
     toast(enAttente() ? `Séance gardée sur ton téléphone · ${pluriel(lignes.length, 'série')}. Elle sera envoyée à ton coach dès le retour du réseau.`
       : `Séance enregistrée · ${pluriel(lignes.length, 'série')}`)
-    nav('/')
+    nav(accueil)
   }
 
   function abandonner() {
@@ -283,7 +284,7 @@ export default function SeanceGuidee() {
             <details key={`b-${ex.id}`} className="video-ex"><summary>Voir la vidéo</summary><Video url={ex.lien_video} titre={ex.nom} /></details>
           )}
           {ex.licence && <small className="sub licence">Source : {ex.licence}</small>}
-          <EcrireAuCoach exercice={ex} seanceId={s.id} />
+          {profil.role !== 'coach' && <EcrireAuCoach exercice={ex} seanceId={s.id} />}
         </div>
         <div className="card setcard">
           <div className="row" style={{ justifyContent: 'space-between' }}>

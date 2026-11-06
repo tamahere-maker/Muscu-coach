@@ -56,7 +56,7 @@ export default function PlanEditeur() {
     supabase.from('aliments').select('id, categorie, nom, marque, code_barres, kcal, proteines, glucides, lipides, unite_nom, unite_pluriel, unite_g, cac_g, cas_g, densite').order('nom')
       .then(({ data }) => setAliments(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
-      .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
+      .then(({ data }) => setAthletes([{ id: profil.id, nom: 'Moi (mon entraînement perso)' }, ...(data ?? []).map((c) => c.athlete).filter((a) => a && a.id !== profil.id)]))
     chargerRecettes()
   }, [profil.id])
   function chargerRecettes() {
@@ -166,13 +166,13 @@ export default function PlanEditeur() {
   async function attribuer() {
     const { error } = await supabase.rpc('attribuer_plan', { m: id, a: cible })
     if (error) return toast(error.message)
-    toast(`Plan attribué à ${athletes.find((a) => a.id === cible)?.nom}`)
+    toast(`Plan attribué à ${cible === profil.id ? 'toi : retrouve-le dans « Moi »' : athletes.find((a) => a.id === cible)?.nom}`)
     setCible('')
   }
   async function supprimer() {
     if (!confirm('Supprimer ce plan ?')) return
     await supabase.from('plans_nutrition').delete().eq('id', id)
-    nav(plan.athlete_id ? '/' : '/nutrition')
+    nav(plan.athlete_id === profil.id ? '/moi/nutrition' : plan.athlete_id ? '/' : '/nutrition')
   }
 
   function saisirObjectif(k, v) {
@@ -195,6 +195,7 @@ export default function PlanEditeur() {
 
   if (!plan) return null
   const modele = !plan.athlete_id
+  const perso = plan.athlete_id === profil.id
   const buts = Object.fromEntries(OBJECTIFS.map(([k]) => [k, plan[cle(k)]]))
   const kcalMacros = 4 * (buts.proteines ?? 0) + 4 * (buts.glucides ?? 0) + 9 * (buts.lipides ?? 0)
   const poids = plan.athlete?.athlete_profiles?.poids_kg
@@ -203,9 +204,9 @@ export default function PlanEditeur() {
   return (
     <>
       <div>
-        <button className="linkbtn" onClick={() => nav(modele ? '/nutrition' : '/')}>← {modele ? 'Plans alimentaires' : 'Mes athlètes'}</button>
+        <button className="linkbtn" onClick={() => nav(modele ? '/nutrition' : perso ? '/moi/nutrition' : '/')}>← {modele ? 'Plans alimentaires' : perso ? 'Ma nutrition' : 'Mes athlètes'}</button>
         <h1 style={{ marginTop: 8 }}>{plan.nom}</h1>
-        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les plans déjà attribués.' : `Plan de ${plan.athlete?.nom}`}</p>
+        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les plans déjà attribués.' : perso ? 'Ton plan perso : tes modifications s’appliquent tout de suite dans « Moi ».' : `Plan de ${plan.athlete?.nom}`}</p>
       </div>
 
       <div className="card">
@@ -338,11 +339,11 @@ export default function PlanEditeur() {
 
       {modele && (
         <div className="card">
-          <h2>Attribuer à un athlète</h2>
-          {athletes.length === 0 ? <p className="empty">Tu n’as pas encore d’athlète. Le plan reste prêt pour plus tard.</p> : (
+          <h2>Attribuer à un athlète ou à moi</h2>
+          {(
             <div className="row" style={{ flexWrap: 'nowrap' }}>
               <select className="inp" value={cible} onChange={(e) => setCible(e.target.value)} aria-label="Athlète">
-                <option value="">Choisir un athlète</option>
+                <option value="">Choisir</option>
                 {athletes.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
               </select>
               <button className="btn" disabled={!cible} onClick={attribuer}>Attribuer</button>

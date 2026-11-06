@@ -84,7 +84,7 @@ export default function ListeCourses() {
   return (
     <>
       <div>
-        <Link className="linkbtn" to="/nutrition">← Nutrition</Link>
+        <Link className="linkbtn" to={profil.role === 'coach' ? '/moi/nutrition' : '/nutrition'}>← Nutrition</Link>
         <h1 style={{ marginTop: 8 }}>Liste de courses</h1>
         <p className="sub">Ce qu’il faut pour suivre ton plan{plan?.jours_differents ? ` : ${nbEntr} jour${nbEntr > 1 ? 's' : ''} d’entraînement et ${nbRepos} jour${nbRepos > 1 ? 's' : ''} de repos` : ''}, à partir d’aujourd’hui. Les aliments que tu remplaces ne sont pas comptés.</p>
       </div>

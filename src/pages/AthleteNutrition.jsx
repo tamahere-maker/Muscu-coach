@@ -16,7 +16,7 @@ const jourFr = (iso) => new Date(iso + 'T12:00').toLocaleDateString('fr-FR', { w
 
 // Onglet Nutrition de l'athlète : il confirme ce qu'il a mangé, change un aliment ou sa quantité.
 // En lecture (`lecture`), le coach voit la même chose pour son athlète `athleteId`.
-export default function AthleteNutrition({ athleteId, lecture = false }) {
+export default function AthleteNutrition({ athleteId, lecture = false, perso = false }) {
   const { profil } = useSession()
   const aid = athleteId ?? profil.id
   const [plan, setPlan] = useState(undefined)
@@ -72,7 +72,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
   if (!plan) return lecture ? <p className="empty">Aucun plan alimentaire attribué.</p> : (
     <>
       <div><h1>Nutrition</h1></div>
-      <p className="empty">Ton coach n’a pas encore préparé ton plan alimentaire.</p>
+      <p className="empty">{perso ? 'Crée un plan alimentaire dans Nutrition, puis attribue-le à « Moi ».' : 'Ton coach n’a pas encore préparé ton plan alimentaire.'}</p>
     </>
   )
 
@@ -189,7 +189,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
         </div>
         {lecture ? <h2 style={{ margin: 0 }}>{plan.nom || 'Plan alimentaire'}</h2> : <h1>{plan.nom || 'Ta journée'}</h1>}
         {!lecture && <p className="sub">Touche ✓ quand tu as mangé ce qui est prévu. Si tu as mangé autre chose, touche « Changer » ou modifie la quantité.</p>}
-        {!lecture && <div className="row"><Link className="btn ghost sm" to="/courses">Liste de courses</Link></div>}
+        {!lecture && <div className="row"><Link className="btn ghost sm" to="/courses">Liste de courses</Link>{perso && <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>Modifier mon plan</Link>}</div>}
       </div>
 
       {plan.jours_differents && (
@@ -212,7 +212,7 @@ export default function AthleteNutrition({ athleteId, lecture = false }) {
           {barre('Protéines', 'm-p', mange.proteines, buts.proteines, 'g')}
           {barre('Glucides', 'm-g', mange.glucides, buts.glucides, 'g')}
           {barre('Lipides', 'm-l', mange.lipides, buts.lipides, 'g')}
-          <p className="sub" style={{ margin: 0 }}>Seuls les aliments confirmés sont comptés.{lecture ? '' : ' Ton coach voit ton suivi.'}</p>
+          <p className="sub" style={{ margin: 0 }}>Seuls les aliments confirmés sont comptés.{lecture || perso ? '' : ' Ton coach voit ton suivi.'}</p>
         </div>
         <div className="card eau">
           <div className="row" style={{ justifyContent: 'space-between' }}><h2 style={{ margin: 0 }}>Eau</h2>

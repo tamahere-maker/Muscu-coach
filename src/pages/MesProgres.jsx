@@ -14,7 +14,7 @@ export default function MesProgres() {
   if (objectif === undefined) return null
   return (
     <>
-      <div><Link className="linkbtn" to="/">‹ Mes séances</Link><h1>Mes progrès</h1></div>
+      <div><Link className="linkbtn" to={profil.role === 'coach' ? '/moi' : '/'}>‹ Mes séances</Link><h1>Mes progrès</h1></div>
       <Progres athleteId={profil.id} objectifSemaine={objectif} />
     </>
   )
