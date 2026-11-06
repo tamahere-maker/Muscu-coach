@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { etapes, garderEnCours, lireEnCours, remplacants } from '../lib/seance'
+import { etapes, garderEnCours, lignesDuBloc, lireEnCours, prochaineEtape, remplacants } from '../lib/seance'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { Anim, fmt, jourIso, toast } from '../lib/ui'
@@ -141,7 +141,12 @@ export default function SeanceGuidee() {
   const ex = exDe(l)
   const st = actif.sets[l.id][e.serie]
   const idxEx = s.lignes.indexOf(l)
-  const suivante = et.find((x, k) => k > cur && !fait(x)) ?? et.find((x) => !fait(x) && x !== e)
+  const plusTard = actif.plusTard ?? []
+  const nSuiv = prochaineEtape(et, actif.sets, cur, plusTard)
+  const suivante = nSuiv >= 0 && et[nSuiv] !== e ? et[nSuiv] : null
+  const bloc = lignesDuBloc(s.lignes, l.id)
+  // Un exercice passé redevient normal dès qu'on y revient
+  const sansBloc = (ids) => ids.filter((x) => !bloc.includes(x))
 
   const majSerie = (patch) => maj({ sets: { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, ...patch } : x)) } })
   const pas = (k, d) => majSerie({ [k]: Math.max(0, Math.round((Number(st[k]) + d) * 10) / 10) })
@@ -150,15 +155,30 @@ export default function SeanceGuidee() {
     // Les séries suivantes de l'exercice reprennent la charge et les répétitions qu'on vient de faire
     const sets = { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, fait: true }
       : k > e.serie && !x.fait ? { ...x, reps: st.reps, kg: st.kg } : x)) }
-    const reste = (x) => !sets[x.ligne][x.serie].fait
-    const n = et.findIndex((x, k) => k > cur && reste(x))
-    const prochain = n >= 0 ? n : et.findIndex(reste)
+    const pt = sansBloc(plusTard)
+    const prochain = prochaineEtape(et, sets, cur, pt)
     const termine = prochain < 0
     // Dans un superset, on enchaîne sans repos ; on repose après le dernier exercice du tour
     const r = !termine && e.repos > 0 ? Date.now() + e.repos * 1000 : 0
-    maj({ sets, cur: termine ? cur : prochain, repos: r })
+    maj({ sets, cur: termine ? cur : prochain, repos: r, plusTard: pt })
     if (!termine && e.repos === 0 && e.superset) toast(`Enchaîne : ${exDe(ligneDe(et[prochain])).nom}`)
+    else if (!termine && pt.includes(et[prochain].ligne)) toast(`On revient à ${exDe(ligneDe(et[prochain])).nom}, que tu avais passé`)
     window.scrollTo(0, 0)
+  }
+
+  // Machine prise : on passe tout l'exercice (ou le superset) et on y reviendra à la fin
+  const autresAFaire = et.some((x) => !bloc.includes(x.ligne) && !fait(x))
+  function passer() {
+    const pt = [...sansBloc(plusTard), ...bloc]
+    const n = prochaineEtape(et, actif.sets, cur, pt)
+    if (n < 0 || bloc.includes(et[n].ligne)) { toast('Il ne reste que cet exercice à faire.'); return }
+    maj({ cur: n, repos: 0, plusTard: pt })
+    toast(`${ex.nom} passé, on y reviendra à la fin`)
+    window.scrollTo(0, 0)
+  }
+  // Aller à un exercice depuis la liste : s'il était passé, il redevient normal
+  function allerA(ligneId, k) {
+    maj({ cur: k, plusTard: plusTard.filter((x) => !lignesDuBloc(s.lignes, ligneId).includes(x)) })
   }
 
   async function ouvrirRempl() {
@@ -189,6 +209,8 @@ export default function SeanceGuidee() {
   // Sans réseau, la séance est gardée sur l'appareil et envoyée au retour du réseau (horsligne.js) :
   // les identifiants sont créés ici pour qu'un nouvel envoi ne crée pas de doublon.
   async function terminer() {
+    const restants = s.lignes.filter((li) => plusTard.includes(li.id) && actif.sets[li.id].some((z) => !z.fait))
+    if (!fini && restants.length && !confirm(`Tu as passé ${restants.map((li) => exDe(li).nom).join(', ')}. Terminer quand même ?`)) return
     const lignesFaites = s.lignes.flatMap((li) => actif.sets[li.id].map((z, k) => ({ li, z, k })).filter(({ z }) => z.fait))
     if (!lignesFaites.length) { toast('Valide au moins une série avant de terminer.'); return }
     setEnvoi(true)
@@ -282,13 +304,17 @@ export default function SeanceGuidee() {
           <button className="btn big-btn" onClick={valider}>{st.fait ? 'Corriger la série ✓' : 'Valider la série ✓'}</button>
           <div className="setlist">
             {actif.sets[l.id].map((z, k) => (
-              <div key={k} className={`${z.fait ? 'ok' : ''} ${k === e.serie ? 'cur' : ''}`} onClick={() => maj({ cur: et.findIndex((x) => x.ligne === l.id && x.serie === k) })}>
+              <div key={k} className={`${z.fait ? 'ok' : ''} ${k === e.serie ? 'cur' : ''}`} onClick={() => allerA(l.id, et.findIndex((x) => x.ligne === l.id && x.serie === k))}>
                 <span>Série {k + 1}</span><span>{z.reps} reps × {fmt(z.kg || 0, 1)} kg</span><span className="tick">{z.fait ? '✓' : ''}</span>
               </div>
             ))}
           </div>
           {suivante && !fini && <p className="sub" style={{ margin: 0 }}>Ensuite : <strong>{exDe(ligneDe(suivante)).nom}</strong>{suivante.ligne !== l.id || e.superset ? ` · série ${suivante.serie + 1}` : ''}</p>}
-          <button className="linkbtn" onClick={ouvrirRempl}>Machine prise ? Remplacer l’exercice</button>
+          <div className="occupee">
+            <span className="sub">Machine prise ?</span>
+            {autresAFaire && <button className="linkbtn" onClick={passer}>Passer, j’y reviendrai{e.superset ? ' (superset entier)' : ''}</button>}
+            <button className="linkbtn" onClick={ouvrirRempl}>Remplacer l’exercice</button>
+          </div>
         </div>
       </div>
 
@@ -298,11 +324,12 @@ export default function SeanceGuidee() {
           {s.lignes.map((li, i) => {
             const ok = actif.sets[li.id].filter((z) => z.fait).length
             const premier = et.findIndex((x) => x.ligne === li.id && !fait(x))
+            const passe = plusTard.includes(li.id) && ok < li.series
             return (
-              <button key={li.id} className="sub-item" onClick={() => { maj({ cur: premier >= 0 ? premier : et.findIndex((x) => x.ligne === li.id) }); window.scrollTo(0, 0) }}>
+              <button key={li.id} className="sub-item" onClick={() => { allerA(li.id, premier >= 0 ? premier : et.findIndex((x) => x.ligne === li.id)); window.scrollTo(0, 0) }}>
                 <Anim ex={exDe(li)} cls="s" />
                 <span><strong>{i + 1}. {exDe(li).nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>{ok} / {li.series} séries faites</span></span>
-                <span className={`pill ${ok === li.series ? 'ok' : li.id === l.id ? 'acc' : ''}`}>{ok === li.series ? 'Fait' : li.id === l.id ? 'En cours' : 'Aller'}</span>
+                <span className={`pill ${ok === li.series ? 'ok' : li.id === l.id ? 'acc' : passe ? 'warn' : ''}`}>{ok === li.series ? 'Fait' : li.id === l.id ? 'En cours' : passe ? 'Plus tard' : 'Aller'}</span>
               </button>
             )
           })}

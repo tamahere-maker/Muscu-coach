@@ -16,6 +16,21 @@ export function etapes(lignes) {
   return res
 }
 
+// Exercices du même bloc (un superset se passe en entier)
+export function lignesDuBloc(lignes, ligneId) {
+  return blocs(lignes).find((b) => b.items.some(({ l }) => l.id === ligneId))?.items.map(({ l }) => l.id) ?? [ligneId]
+}
+
+// Prochaine étape à faire après `cur` : d'abord les séries pas faites des exercices non passés
+// (dans l'ordre, en repartant du début), puis celles des exercices passés « pour plus tard ». -1 si tout est fait.
+export function prochaineEtape(et, sets, cur, plusTard = []) {
+  const reste = (x) => !sets[x.ligne]?.[x.serie]?.fait
+  const ordre = [...et.keys()].filter((k) => k > cur).concat([...et.keys()].filter((k) => k <= cur))
+  const libre = ordre.find((k) => reste(et[k]) && !plusTard.includes(et[k].ligne))
+  if (libre != null) return libre
+  return ordre.find((k) => reste(et[k])) ?? -1
+}
+
 // Exercices de remplacement : même muscle principal, même type de mouvement, avec le matériel de l'athlète
 export function remplacants(e, candidats, materiel = [], n = 6) {
   const tout = materiel.includes('Salle complète') || materiel.length === 0
