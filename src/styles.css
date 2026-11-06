@@ -402,3 +402,4 @@ nav.tabs .ico{flex:none}
 .adherence .num.warn,.adherence td.warn{color:var(--warn)}
 .ecarts-macros{display:flex;flex-wrap:wrap;gap:6px}
 .lien-mini{background:none;border:0;padding:0 0 0 6px;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
+.occupee{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
