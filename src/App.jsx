@@ -33,6 +33,7 @@ import ContratModele from './pages/ContratModele'
 import { ContratRequis } from './lib/contrat'
 import ListeCourses from './pages/ListeCourses'
 import { prechargerAthlete } from './lib/chargements'
+import MonEspace from './pages/MonEspace'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
 const MESSAGE_LIEN = LIEN_EMAIL_PARTIEL ? 'Lien accepté. Ouvre aussi celui envoyé à ton autre adresse pour finir le changement.'
@@ -47,9 +48,9 @@ export default function App() {
   useEffect(() => { if (pret && MESSAGE_LIEN) toast(MESSAGE_LIEN) }, [pret])
   // Notifications : l'appareil reste rattaché au compte connecté ; toucher une notification ouvre la conversation
   useEffect(() => { if (pret) rafraichirPush().catch(() => {}) }, [profil?.id])
-  // Athlète : séances et plan du jour chargés d'avance pour la salle, même sans réseau (puis au retour du réseau)
+  // Séances et plan du jour chargés d'avance pour la salle, même sans réseau (athlète, et coach pour son espace « Moi »)
   useEffect(() => {
-    if (profil?.role !== 'athlete') return
+    if (!profil) return
     const f = () => prechargerAthlete(profil.id)
     f(); window.addEventListener('online', f)
     return () => window.removeEventListener('online', f)
@@ -85,6 +86,7 @@ export default function App() {
                 <NavLink to="/programmes" aria-label="Programmes" title="Programmes"><Icone nom="programmes" /><span className="lbl">Programmes</span></NavLink>
                 <NavLink to="/nutrition" aria-label="Nutrition" title="Nutrition"><Icone nom="nutrition" /><span className="lbl">Nutrition</span></NavLink>
                 <NavLink to="/exercices" className={() => (/^\/(exercices|aliments|recettes)/.test(location.pathname) ? 'active' : undefined)} aria-label="Bibliothèque" title="Bibliothèque"><Icone nom="bibliotheque" /><span className="lbl">Bibliothèque</span></NavLink>
+                <NavLink to="/moi" className={() => (/^\/(moi|seance|progres|courses)/.test(location.pathname) ? 'active' : undefined)} aria-label="Moi" title="Mon entraînement et ma nutrition"><Icone nom="entrainement" /><span className="lbl">Moi</span></NavLink>
                 <NavLink to="/messages" aria-label={totalNonLus > 0 ? `Messages, ${totalNonLus} non lus` : 'Messages'} title="Messages"><Icone nom="messages" /><span className="lbl">Messages</span>{totalNonLus > 0 && !location.pathname.startsWith('/messages') && <span className="badge" aria-hidden="true">{totalNonLus}</span>}</NavLink>
               </>
             ) : (
@@ -115,8 +117,12 @@ export default function App() {
               {profil.role === 'coach' && <Route path="/programmes/:id" element={<ProgrammeEditeur />} />}
               <Route path="/nutrition" element={profil.role === 'coach' ? <Plans /> : <ContratRequis><AthleteNutrition /></ContratRequis>} />
               {profil.role === 'athlete' && <Route path="/seance/:id" element={<ContratRequis><SeanceGuidee /></ContratRequis>} />}
+              {profil.role === 'coach' && <Route path="/seance/:id" element={<SeanceGuidee />} />}
+              {profil.role === 'coach' && <Route path="/moi" element={<MonEspace />} />}
+              {profil.role === 'coach' && <Route path="/moi/nutrition" element={<MonEspace vue="nutrition" />} />}
+              {profil.role === 'coach' && <Route path="/courses" element={<ListeCourses />} />}
               {profil.role === 'athlete' && <Route path="/profil" element={<AthleteProfil />} />}
-              {profil.role === 'athlete' && <Route path="/progres" element={<MesProgres />} />}
+              <Route path="/progres" element={<MesProgres />} />
               <Route path="/messages" element={profil.role === 'coach' ? <CoachMessages /> : <MesMessages />} />
               {profil.role === 'coach' && <Route path="/messages/:id" element={<CoachMessages />} />}
               {profil.role === 'coach' && <Route path="/athletes/:id" element={<AthleteSuivi />} />}

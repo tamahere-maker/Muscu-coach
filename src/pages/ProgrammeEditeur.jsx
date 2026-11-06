@@ -45,7 +45,7 @@ export default function ProgrammeEditeur() {
   useEffect(() => {
     supabase.from('exercices').select('id, nom, muscles, secondaires, materiel, essentiel, sprite, cree_par, image_url, wger_id').order('id').then(({ data }) => setExos(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
-      .then(({ data }) => setAthletes((data ?? []).map((c) => c.athlete)))
+      .then(({ data }) => setAthletes([{ id: profil.id, nom: 'Moi (mon entraînement perso)' }, ...(data ?? []).map((c) => c.athlete).filter((a) => a && a.id !== profil.id)]))
   }, [profil.id])
   useEffect(() => { if (ajoutDans || remplace) dlg.current.showModal() }, [ajoutDans, remplace])
 
@@ -150,24 +150,25 @@ export default function ProgrammeEditeur() {
   async function attribuer() {
     const { error } = await supabase.rpc('attribuer_modele', { m: id, a: cible })
     if (error) return toast(error.message)
-    toast(`Programme attribué à ${athletes.find((a) => a.id === cible)?.nom}`)
+    toast(`Programme attribué à ${cible === profil.id ? 'toi : retrouve-le dans « Moi »' : athletes.find((a) => a.id === cible)?.nom}`)
     setCible('')
   }
   async function supprimer() {
     if (!confirm('Supprimer ce programme ?')) return
     await supabase.from('programmes').delete().eq('id', id)
-    nav(prog.athlete_id ? '/' : '/programmes')
+    nav(prog.athlete_id === profil.id ? '/moi' : prog.athlete_id ? '/' : '/programmes')
   }
 
   if (!prog) return null
   const modele = !prog.athlete_id
+  const perso = prog.athlete_id === profil.id
 
   return (
     <>
       <div>
-        <button className="linkbtn" onClick={() => nav(modele ? '/programmes' : '/')}>← {modele ? 'Mes programmes' : 'Mes athlètes'}</button>
+        <button className="linkbtn" onClick={() => nav(modele ? '/programmes' : perso ? '/moi' : '/')}>← {modele ? 'Mes programmes' : perso ? 'Mon entraînement' : 'Mes athlètes'}</button>
         <h1 style={{ marginTop: 8 }}>{prog.nom}</h1>
-        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les programmes déjà attribués.' : `Programme de ${prog.athlete?.nom} : tes modifications lui sont visibles tout de suite.`}</p>
+        <p className="sub">{modele ? 'Modèle : les modifications ne touchent pas les programmes déjà attribués.' : perso ? 'Ton programme perso : tes modifications s’appliquent tout de suite dans « Moi ».' : `Programme de ${prog.athlete?.nom} : tes modifications lui sont visibles tout de suite.`}</p>
       </div>
 
       <div className="card">
@@ -259,11 +260,11 @@ export default function ProgrammeEditeur() {
 
       {modele && (
         <div className="card">
-          <h2>Attribuer à un athlète</h2>
-          {athletes.length === 0 ? <p className="empty">Tu n’as pas encore d’athlète. Le programme reste prêt pour plus tard.</p> : (
+          <h2>Attribuer à un athlète ou à moi</h2>
+          {(
             <div className="row" style={{ flexWrap: 'nowrap' }}>
               <select className="inp" value={cible} onChange={(e) => setCible(e.target.value)} aria-label="Athlète">
-                <option value="">Choisir un athlète</option>
+                <option value="">Choisir</option>
                 {athletes.map((a) => <option key={a.id} value={a.id}>{a.nom}</option>)}
               </select>
               <button className="btn" disabled={!cible || seances.length === 0} onClick={attribuer}>Attribuer</button>

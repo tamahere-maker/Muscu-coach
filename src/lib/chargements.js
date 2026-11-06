@@ -8,7 +8,7 @@ import { jourIso } from './ui'
 export const CHAMPS_EX = 'id, nom, sprite, image_url, consigne, consigne_en, lien_video, licence, wger_id, muscles, materiel, categorie, force, mecanique, niveau, essentiel'
 
 // ----- Entraînement -----
-export const chargerProgramme = (aid) => supabase.from('programmes').select('nom, description, seances(id, ordre, nom, note, seance_exercices(id, series))')
+export const chargerProgramme = (aid) => supabase.from('programmes').select('id, nom, description, seances(id, ordre, nom, note, seance_exercices(id, series))')
   .eq('athlete_id', aid).eq('actif', true).maybeSingle()
 export const chargerSeance = (id) => supabase.from('seances')
   .select(`id, nom, note, programme:programmes(nom, coach_id), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, exercice:exercices(${CHAMPS_EX}))`)
