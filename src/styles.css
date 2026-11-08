@@ -403,3 +403,10 @@ nav.tabs .ico{flex:none}
 .ecarts-macros{display:flex;flex-wrap:wrap;gap:6px}
 .lien-mini{background:none;border:0;padding:0 0 0 6px;color:var(--accent);font:inherit;font-size:12px;cursor:pointer;text-decoration:underline}
 .occupee{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center}
+/* Cardio : chrono et saisie d'un bloc en séance, objectifs dans l'éditeur */
+.chrono-cardio{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;border-radius:var(--r);background:var(--surface-2)}
+.chrono-cardio .t{font-family:var(--display);font-size:48px;font-weight:800;line-height:1}
+.chrono-cardio .progress{width:100%}
+.saisie-cardio{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.saisie-cardio input{font-size:16px}
+.cardio-kpis .kpi b{font-size:22px}

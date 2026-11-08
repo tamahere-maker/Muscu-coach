@@ -10,8 +10,11 @@ import { chercherExercices } from '../lib/recherche'
 import { garderExercice } from '../lib/wger'
 import { useFavoris } from '../lib/FicheCoach'
 import { JOURS_SEMAINE } from '../lib/jours'
+import { dureeSaisie, estCardio, estCardioEx, lireDuree, typeAllure } from '../lib/cardio'
 
 const CHAMPS_EX = [['series', 'Séries', 1], ['reps', 'Reps', 1], ['charge_kg', 'Charge (kg)', 0.5], ['repos_s', 'Repos (s)', 15]]
+// Objectif par défaut d'un exercice cardio ajouté : 30 min en continu
+const CARDIO_DEFAUT = { series: 1, reps: 0, charge_kg: 0, repos_s: 60, duree_s: 1800 }
 
 // Édition d'un programme : un modèle du coach, ou le programme d'un athlète
 export default function ProgrammeEditeur() {
@@ -34,7 +37,7 @@ export default function ProgrammeEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('programmes')
-      .select('id, nom, description, prix_eur, jours_entrainement, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe))')
+      .select('id, nom, description, prix_eur, jours_entrainement, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe, duree_s, distance_m, intensite))')
       .eq('id', id).single()
     if (!data) return
     setProg(data)
@@ -43,7 +46,7 @@ export default function ProgrammeEditeur() {
   }
   useEffect(() => { charger() }, [id])
   useEffect(() => {
-    supabase.from('exercices').select('id, nom, muscles, secondaires, materiel, essentiel, sprite, cree_par, image_url, wger_id').order('id').then(({ data }) => setExos(data ?? []))
+    supabase.from('exercices').select('id, nom, muscles, secondaires, materiel, categorie, essentiel, sprite, cree_par, image_url, wger_id').order('id').then(({ data }) => setExos(data ?? []))
     supabase.from('coachings').select('athlete:profiles!coachings_athlete_id_fkey(id, nom)').eq('coach_id', profil.id)
       .then(({ data }) => setAthletes([{ id: profil.id, nom: 'Moi (mon entraînement perso)' }, ...(data ?? []).map((c) => c.athlete).filter((a) => a && a.id !== profil.id)]))
   }, [profil.id])
@@ -99,7 +102,12 @@ export default function ProgrammeEditeur() {
   async function ajouterExercice(e) {
     if (remplace) {
       const avant = exo[remplace.exercice_id]?.nom
-      const { error } = await supabase.from('seance_exercices').update({ exercice_id: e.id }).eq('id', remplace.id)
+      // Passage vers ou depuis un exercice cardio : l'objectif change de forme (durée / distance ou séries × reps)
+      const ancien = exo[remplace.exercice_id]
+      const versCardio = estCardioEx(e) && remplace.duree_s == null && remplace.distance_m == null
+      const depuisCardio = !estCardioEx(e) && estCardioEx(ancien)
+      const champs = { exercice_id: e.id, ...(versCardio ? CARDIO_DEFAUT : depuisCardio ? { duree_s: null, distance_m: null, intensite: null, series: 3, reps: 10, repos_s: 90 } : {}) }
+      const { error } = await supabase.from('seance_exercices').update(champs).eq('id', remplace.id)
       if (error) return toast(error.message)
       dlg.current.close()
       toast(`${avant} remplacé par ${e.nom}`)
@@ -108,6 +116,7 @@ export default function ProgrammeEditeur() {
     const l = ajoutDans.seance_exercices
     const { error } = await supabase.from('seance_exercices').insert({
       seance_id: ajoutDans.id, exercice_id: e.id, ordre: l.length ? Math.max(...l.map((x) => x.ordre)) + 1 : 0,
+      ...(estCardioEx(e) ? CARDIO_DEFAUT : {}),
     })
     if (error) return toast(error.message)
     dlg.current.close()
@@ -232,13 +241,18 @@ export default function ProgrammeEditeur() {
                             <button className="icon-btn" aria-label="Retirer" onClick={() => retirer(l)}>×</button>
                           </span>
                         </div>
+                        {estCardio(l, exo[l.exercice_id]) ? <ParamsCardio l={l} ex={exo[l.exercice_id]} majLigne={majLigne} /> : (
                         <div className="params">
                           {CHAMPS_EX.map(([k, lib, pas]) => (
                             <label key={k} className="field"><span className="label">{lib}</span>
                               <input type="number" min="0" step={pas} defaultValue={l[k]}
                                 onBlur={(e) => e.target.value !== '' && Number(e.target.value) !== Number(l[k]) && majLigne(l, { [k]: Number(e.target.value) })} /></label>
                           ))}
-                        </div>
+                        </div>)}
+                        {!estCardioEx(exo[l.exercice_id]) && (
+                          <button className="linkbtn" onClick={() => majLigne(l, estCardio(l) ? { duree_s: null, distance_m: null, intensite: null } : { duree_s: 45, reps: 0 })}>
+                            {estCardio(l) ? 'Revenir aux répétitions' : 'Mesurer en durée (gainage, intervalles…)'}</button>
+                        )}
                         <input type="text" className="note-ex" aria-label={`Note pour ${exo[l.exercice_id].nom}`} defaultValue={l.note}
                           placeholder="Note pour l’athlète (tempo, placement…)"
                           onBlur={(e) => e.target.value !== l.note && majLigne(l, { note: e.target.value })} />
@@ -329,6 +343,39 @@ export default function ProgrammeEditeur() {
           </div>
         )}
       </dialog>
+    </>
+  )
+}
+
+// Objectif d'un exercice cardio ou en durée : blocs × (durée et/ou distance), récupération entre les blocs, intensité
+function ParamsCardio({ l, ex, majLigne }) {
+  const enMetres = typeAllure(ex) === '100m'
+  const distTexte = l.distance_m == null ? '' : enMetres ? String(l.distance_m) : String(l.distance_m / 1000).replace('.', ',')
+  const lireDist = (t) => {
+    const v = Number(String(t).trim().replace(',', '.'))
+    return String(t).trim() && v > 0 ? Math.round(enMetres ? v : v * 1000) : null
+  }
+  const cle = `${l.id}-${l.duree_s}-${l.distance_m}`
+  return (
+    <>
+      <div className="params params-cardio">
+        <label className="field"><span className="label">Blocs</span>
+          <input type="number" min="1" step="1" defaultValue={l.series}
+            onBlur={(e) => Number(e.target.value) >= 1 && Number(e.target.value) !== l.series && majLigne(l, { series: Math.round(Number(e.target.value)) })} /></label>
+        <label className="field"><span className="label">Durée {l.series > 1 ? 'par bloc' : ''}</span>
+          <input key={`d-${cle}`} type="text" inputMode="decimal" placeholder="min ou m:ss" defaultValue={dureeSaisie(l.duree_s)}
+            onBlur={(e) => { const v = lireDuree(e.target.value); if (v !== l.duree_s && (v || l.distance_m)) majLigne(l, { duree_s: v }) }} /></label>
+        <label className="field"><span className="label">Distance ({enMetres ? 'm' : 'km'})</span>
+          <input key={`m-${cle}`} type="text" inputMode="decimal" placeholder="Optionnel" defaultValue={distTexte}
+            onBlur={(e) => { const v = lireDist(e.target.value); if (v !== l.distance_m && (v || l.duree_s)) majLigne(l, { distance_m: v }) }} /></label>
+        <label className="field"><span className="label">{l.series > 1 ? 'Récup (s)' : 'Repos après (s)'}</span>
+          <input type="number" min="0" step="15" defaultValue={l.repos_s}
+            onBlur={(e) => e.target.value !== '' && Number(e.target.value) !== l.repos_s && majLigne(l, { repos_s: Number(e.target.value) })} /></label>
+      </div>
+      <input type="text" className="note-ex" aria-label={`Intensité pour ${ex.nom}`} defaultValue={l.intensite ?? ''} maxLength={120}
+        placeholder="Intensité : zone 2, FC 130-145, allure 5:30 /km, RPE 7…"
+        onBlur={(e) => (e.target.value.trim() || null) !== l.intensite && majLigne(l, { intensite: e.target.value.trim() || null })} />
+      <small className="sub">Durée en minutes (30) ou en minutes:secondes (0:45). Plusieurs blocs = fractionné, avec la récup entre chaque bloc.</small>
     </>
   )
 }
