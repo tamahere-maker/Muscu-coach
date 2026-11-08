@@ -4,12 +4,12 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
 import { CHAMPS_REQUIS, TexteContrat, genererTexte, manquants } from '../lib/contrat'
+import { BadgeCarte, carteValide, dateFr, useCartePro } from '../lib/cartePro'
 
 const VIDE = { denomination: '', statut_juridique: '', siret: '', adresse: '', email_contact: '', diplome: '', assurance: '', mediateur: '',
   delai_reponse: '48 heures ouvrées', preavis_jours: 15, clauses_perso: '', version: 0 }
 const AIDE = {
   statut_juridique: 'Ex. : micro-entreprise, EI, SASU',
-  diplome: 'Ex. : BPJEPS AF, carte professionnelle n° …',
   assurance: 'Assureur et numéro de contrat',
   mediateur: 'Nom et site internet du médiateur auquel tu as adhéré',
 }
@@ -19,6 +19,7 @@ export default function ContratModele() {
   const { session, profil } = useSession()
   const [m, setM] = useState(null)
   const [apercu, setApercu] = useState(false)
+  const [carte] = useCartePro(profil.id)
 
   useEffect(() => {
     supabase.from('contrats_modeles').select('*').eq('coach_id', profil.id).maybeSingle()
@@ -51,6 +52,12 @@ export default function ContratModele() {
 
       <form className="card" onSubmit={enregistrer}>
         <h2>Mes informations légales</h2>
+        <div className="liste">
+          <div>
+            <span>Diplôme et carte professionnelle{carte?.numero && <> : {carte.diplome}, n° {carte.numero}{carte.expire_le && `, valable jusqu’au ${dateFr(carte.expire_le)}`}</>}</span>
+            <span className="row">{carte !== undefined && <BadgeCarte carte={carte} />}<Link className="btn ghost sm" to="/carte-pro">{carte ? 'Modifier' : 'Renseigner'}</Link></span>
+          </div>
+        </div>
         <div className="grid2">
           {CHAMPS_REQUIS.map(([k, l]) => (
             <label key={k} className="field"><span className="label">{l}</span>
@@ -63,6 +70,7 @@ export default function ContratModele() {
         </div>
         <label className="field"><span className="label">Conditions particulières (facultatif)</span>
           <textarea rows="4" value={m.clauses_perso} onChange={maj('clauses_perso')} placeholder="Ex. : séances en visio incluses, modalités de paiement…" /></label>
+        {carte !== undefined && !carteValide(carte) && <p className="sub" style={{ margin: 0 }}>Renseigne une carte professionnelle en cours de validité avant d’envoyer un contrat.</p>}
         {manque.length > 0 && <p className="sub" style={{ margin: 0 }}>À compléter avant d’envoyer un contrat : {manque.join(', ')}.</p>}
         <div className="row">
           <button className="btn">Enregistrer</button>
@@ -73,7 +81,7 @@ export default function ContratModele() {
 
       {apercu && (
         <div className="card">
-          <TexteContrat texte={genererTexte({ modele: m, athlete: 'Prénom Nom', titre: 'Coaching 12 semaines', prix: 150,
+          <TexteContrat texte={genererTexte({ modele: m, carte, athlete: 'Prénom Nom', titre: 'Coaching 12 semaines', prix: 150,
             debut: new Date().toISOString().slice(0, 10), fin: null, programme: null })} />
         </div>
       )}

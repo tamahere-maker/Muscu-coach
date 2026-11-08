@@ -6,6 +6,7 @@ import { toast } from '../lib/ui'
 import { ChampMdp, IdentifiantCache, estSolide, memoriserIdentifiants, traduire } from '../lib/motdepasse'
 import { CarteApplication } from '../lib/pwa'
 import { CarteNotifications } from '../lib/Messages'
+import { BadgeCarte, useCartePro } from '../lib/cartePro'
 
 // Compte de connexion, commun au coach et à l'athlète : nom, adresse e-mail et mot de passe
 export default function MonCompte() {
@@ -17,6 +18,7 @@ export default function MonCompte() {
   const [mdp, setMdp] = useState({ actuel: '', nouveau: '', confirme: '' })
   const [err, setErr] = useState({})
   const [occupe, setOccupe] = useState(false)
+  const [carte] = useCartePro(profil.role === 'coach' ? profil.id : null)
 
   async function enregistrerNom(e) {
     e.preventDefault()
@@ -93,6 +95,18 @@ export default function MonCompte() {
         {err.mdp && <p className="err">{err.mdp}</p>}
         <div className="row"><button className="btn" disabled={occupe}>Changer le mot de passe</button></div>
       </form>
+
+      {profil.role === 'coach' && (
+        <div className="card">
+          <h2>Ma carte professionnelle</h2>
+          <p className="sub" style={{ margin: 0 }}>Diplôme et carte d’éducateur sportif, obligatoires pour coacher contre rémunération. Affichés à tes athlètes.</p>
+          {carte !== undefined && <p className="sub" style={{ margin: 0 }}><BadgeCarte carte={carte} /></p>}
+          <div className="row">
+            <Link className="btn ghost" to="/carte-pro">{carte ? 'Modifier ma carte' : 'Renseigner ma carte'}</Link>
+            {profil.admin && <Link className="btn ghost" to="/admin/cartes">Vérifier les cartes des coachs</Link>}
+          </div>
+        </div>
+      )}
 
       {profil.role === 'coach' && (
         <div className="card">
