@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
 import { STATUTS } from '../lib/contrat'
 import { MATERIEL, NIVEAUX, OBJECTIFS } from '../lib/listes'
+import { CartesCoachs } from '../lib/cartePro'
 
 // Profil de l'athlète : ses coachs, ses bilans envoyés et les infos utiles au coach
 export default function AthleteProfil() {
@@ -16,7 +17,7 @@ export default function AthleteProfil() {
   const [contrats, setContrats] = useState([])
 
   useEffect(() => {
-    supabase.from('coachings').select('id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
+    supabase.from('coachings').select('id, coach_id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     supabase.from('bilans').select('id, type, statut, created_at, envoye_at, reponse_coach').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
@@ -48,6 +49,8 @@ export default function AthleteProfil() {
           : 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'}</p>
         <p className="sub"><Link className="linkbtn" to="/compte">Mon compte : e-mail et mot de passe</Link></p>
       </div>
+
+      <CartesCoachs coachs={[...coachs].sort((x, y) => y.principal - x.principal)} />
 
       {contrats.length > 0 && (
         <div className="card">

@@ -4,6 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, jourIso, toast } from '../lib/ui'
 import { STATUTS, TexteContrat, genererTexte, manquants } from '../lib/contrat'
+import { carteValide, etatCarte, useCartePro } from '../lib/cartePro'
 
 const dateFr = (d) => new Date(d).toLocaleDateString('fr-FR')
 
@@ -16,6 +17,7 @@ export default function AthleteContrat({ id, nom, programme }) {
   const [f, setF] = useState(null)
   const [apercu, setApercu] = useState(false)
   const [envoi, setEnvoi] = useState(false)
+  const [carte] = useCartePro(profil.id)
 
   async function charger() {
     const { data } = await supabase.from('contrats').select('id, titre, prix_eur, date_debut, date_fin, statut, created_at, accepte_at, coach_id')
@@ -32,13 +34,13 @@ export default function AthleteContrat({ id, nom, programme }) {
     setF({ titre: programme ? `Coaching · ${programme.nom}` : 'Coaching sportif', prix: programme?.prix_eur ?? '', debut: jourIso(), fin: '' })
   }, [programme?.id])
 
-  if (contrats === null || modele === undefined || !f) return null
+  if (contrats === null || modele === undefined || carte === undefined || !f) return null
   const principal = coachs.some((c) => c.principal && c.coach_id === profil.id)
   const enAttente = contrats.find((c) => c.statut === 'envoye')
   const manque = manquants(modele)
   const maj = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }))
   const texte = () => genererTexte({
-    modele, athlete: nom, titre: f.titre.trim(), prix: Number(f.prix) || 0, debut: f.debut, fin: f.fin || null, programme: programme?.nom,
+    modele, carte, athlete: nom, titre: f.titre.trim(), prix: Number(f.prix) || 0, debut: f.debut, fin: f.fin || null, programme: programme?.nom,
     associes: coachs.filter((c) => !c.principal).map((c) => ({ nom: c.coach?.nom || 'Coach associé', perimetre: c.perimetre })),
   })
 
@@ -84,7 +86,14 @@ export default function AthleteContrat({ id, nom, programme }) {
         )}
       </div>
 
-      {principal && (manque.length > 0 ? (
+      {principal && (!carteValide(carte) ? (
+        <div className="card">
+          <h2>Envoyer un contrat</h2>
+          <p className="sub" style={{ margin: 0 }}>{etatCarte(carte).libelle}. Coacher contre rémunération, même à distance, demande un diplôme reconnu
+            et une carte professionnelle en cours de validité : renseigne-la pour pouvoir envoyer un contrat.</p>
+          <div className="row"><Link className="btn" to="/carte-pro">Ma carte professionnelle</Link></div>
+        </div>
+      ) : manque.length > 0 ? (
         <div className="card">
           <h2>Envoyer un contrat</h2>
           <p className="sub" style={{ margin: 0 }}>Complète d’abord ton contrat type : {manque.join(', ')}.</p>

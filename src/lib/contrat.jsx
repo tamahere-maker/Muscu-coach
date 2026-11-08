@@ -22,7 +22,6 @@ export const CHAMPS_REQUIS = [
   ['siret', 'SIRET'],
   ['adresse', 'Adresse professionnelle'],
   ['email_contact', 'E-mail de contact'],
-  ['diplome', 'Diplôme ou carte professionnelle'],
   ['assurance', 'Assurance responsabilité civile professionnelle'],
   ['mediateur', 'Médiateur de la consommation'],
 ]
@@ -38,7 +37,10 @@ export async function empreinte(texte) {
 
 // Texte complet du contrat. Titres de section préfixés par « ## » (affichés en gras dans l'app).
 // Modèle indicatif à faire relire par un juriste : ce n'est pas un avis juridique.
-export function genererTexte({ modele: m, athlete, titre, prix, debut, fin, programme, associes = [] }) {
+export function genererTexte({ modele: m, carte, athlete, titre, prix, debut, fin, programme, associes = [] }) {
+  const qualification = carte?.numero
+    ? `${carte.diplome}, carte professionnelle d’éducateur sportif n° ${carte.numero} valable jusqu’au ${dateLongue(carte.expire_le)}`
+    : m.diplome
   const duree = fin ? `du ${dateLongue(debut)} au ${dateLongue(fin)}` : `à partir du ${dateLongue(debut)}, pour la durée du programme`
   const assoc = associes.length
     ? `Le Coach peut s’appuyer sur ${associes.length > 1 ? 'les coachs associés suivants, qu’il choisit et rémunère' : 'le coach associé suivant, qu’il choisit et rémunère'} : ${associes.map((a) => `${a.nom} (${a.perimetre.toLowerCase()})`).join(', ')}. Le Coach reste le seul interlocuteur contractuel de l’Athlète et répond de leurs prestations.`
@@ -47,13 +49,13 @@ export function genererTexte({ modele: m, athlete, titre, prix, debut, fin, prog
 
 ## 1. Parties
 Le présent contrat est conclu entre :
-- ${m.denomination}, ${m.statut_juridique}, SIRET ${m.siret}, ${m.adresse}, ${m.email_contact}, titulaire de : ${m.diplome}, assuré en responsabilité civile professionnelle auprès de : ${m.assurance} (ci-après « le Coach ») ;
+- ${m.denomination}, ${m.statut_juridique}, SIRET ${m.siret}, ${m.adresse}, ${m.email_contact}, titulaire de : ${qualification}, assuré en responsabilité civile professionnelle auprès de : ${m.assurance} (ci-après « le Coach ») ;
 - ${athlete} (ci-après « l’Athlète »), agissant en qualité de consommateur.
 
 ## 2. Objet
 Le Coach fournit à l’Athlète, au moyen de l’application Muscu Coach, une prestation de coaching sportif à distance : « ${titre} »${programme ? `, programme « ${programme} »` : ''}. Elle comprend un programme d’entraînement personnalisé, un plan nutritionnel et des conseils sur les compléments alimentaires, le suivi des séances et des bilans, et un échange par messagerie.
 ${assoc}
-Les conseils nutritionnels et sur les compléments sont des recommandations d’hygiène de vie : ils ne constituent ni un diagnostic, ni une prescription médicale, ni un traitement.
+Les conseils nutritionnels et sur les compléments sont des recommandations d’hygiène de vie destinées à une personne en bonne santé : ils ne constituent ni un diagnostic, ni une prescription médicale, ni un traitement, et le Coach n’exerce pas la profession de diététicien, sauf mention contraire aux conditions particulières. En cas de pathologie, de traitement médical ou de grossesse, l’Athlète fait valider ces conseils par son médecin avant de les suivre.
 
 ## 3. Durée
 Le contrat est conclu ${duree}. Il n’est pas reconduit tacitement : toute poursuite fait l’objet d’un nouveau contrat accepté par l’Athlète.

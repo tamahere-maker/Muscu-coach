@@ -7,6 +7,7 @@ import { manquePourMetabolisme, metabolisme } from '../lib/nutrition'
 import { useNonLus } from '../lib/Messages'
 import TableauDeBord from '../lib/TableauDeBord'
 import { useDecroches } from '../lib/decroches'
+import { BandeauCarte, useCartePro } from '../lib/cartePro'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -20,6 +21,7 @@ export default function CoachAthletes() {
   const [err, setErr] = useState('')
   const nonLus = useNonLus()
   const decroches = useDecroches(profil.id)
+  const [carte] = useCartePro(profil.id)
 
   async function charger() {
     const [c, i] = await Promise.all([
@@ -58,6 +60,8 @@ export default function CoachAthletes() {
         <h1>Mes athlètes</h1>
         <p className="sub">Invite un athlète avec son e-mail, puis envoie-lui le lien.</p>
       </div>
+
+      <BandeauCarte carte={carte} />
 
       <TableauDeBord nonLus={nonLus} decroches={decroches} />
 

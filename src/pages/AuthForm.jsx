@@ -16,6 +16,7 @@ export default function AuthForm({ role: roleFixe, retour = window.location.orig
   const [nonConfirme, setNonConfirme] = useState(false)
   const [envoye, setEnvoye] = useState(null)
   const [occupe, setOccupe] = useState(false)
+  const [cgu, setCgu] = useState(false)
 
   function changer(m) { setMode(m); setErr(''); setNonConfirme(false) }
 
@@ -25,6 +26,7 @@ export default function AuthForm({ role: roleFixe, retour = window.location.orig
     if (mode === 'inscription') {
       if (!estSolide(mdp)) return setErr('Le mot de passe ne respecte pas toutes les règles.')
       if (mdp !== mdp2) return setErr('Les deux mots de passe ne correspondent pas.')
+      if (role === 'coach' && !cgu) return setErr('Accepte les conditions d’utilisation coach pour créer ton compte.')
     }
     setOccupe(true)
     if (mode === 'oubli') {
@@ -111,6 +113,11 @@ export default function AuthForm({ role: roleFixe, retour = window.location.orig
           autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
       <ChampMdp label="Mot de passe" valeur={mdp} onChange={setMdp} nouveau={mode === 'inscription'} regles={mode === 'inscription'} />
       {mode === 'inscription' && <ChampMdp label="Confirmer le mot de passe" valeur={mdp2} onChange={setMdp2} nouveau name="confirm-password" />}
+      {mode === 'inscription' && role === 'coach' && (
+        <label className="coche"><input type="checkbox" checked={cgu} onChange={(e) => setCgu(e.target.checked)} />
+          <span>J’accepte les <a href="/cgu-coach" target="_blank" rel="noreferrer">conditions d’utilisation coach</a> : coacher contre
+            rémunération demande un diplôme reconnu et une carte professionnelle, que je renseignerai dans l’app.</span></label>
+      )}
       {mode === 'connexion' && <button type="button" className="linkbtn" style={{ justifySelf: 'end' }} onClick={() => changer('oubli')}>Mot de passe oublié ?</button>}
       {err && <p className="err">{err}</p>}
       {nonConfirme && <button type="button" className="btn ghost" disabled={occupe} onClick={renvoyer}>Renvoyer l’e-mail de confirmation</button>}

@@ -34,6 +34,9 @@ import { ContratRequis } from './lib/contrat'
 import ListeCourses from './pages/ListeCourses'
 import { prechargerAthlete } from './lib/chargements'
 import MonEspace from './pages/MonEspace'
+import CartePro from './pages/CartePro'
+import CguCoach from './pages/CguCoach'
+import VerificationCartes from './pages/VerificationCartes'
 
 // Message affiché à l'arrivée depuis un lien reçu par e-mail
 const MESSAGE_LIEN = LIEN_EMAIL_PARTIEL ? 'Lien accepté. Ouvre aussi celui envoyé à ton autre adresse pour finir le changement.'
@@ -104,6 +107,7 @@ export default function App() {
         <Routes>
           <Route path="/invitation/:token" element={<Invitation />} />
           <Route path="/invitation-coach/:token" element={<InvitationCoach />} />
+          <Route path="/cgu-coach" element={<CguCoach />} />
           {!session ? (
             <Route path="*" element={<Connexion />} />
           ) : choixMdp ? (
@@ -131,6 +135,8 @@ export default function App() {
               <Route path="/compte" element={<MonCompte />} />
               <Route path="/contrats/:id" element={<Contrat />} />
               {profil.role === 'coach' && <Route path="/contrat-type" element={<ContratModele />} />}
+              {profil.role === 'coach' && <Route path="/carte-pro" element={<CartePro />} />}
+              {profil.admin && <Route path="/admin/cartes" element={<VerificationCartes />} />}
               {profil.role === 'coach' && <Route path="/nutrition/:id" element={<PlanEditeur />} />}
               {profil.role === 'coach' && <Route path="/exercices" element={<Bibliotheque vue="exercices" />} />}
               {profil.role === 'coach' && <Route path="/aliments" element={<Bibliotheque vue="aliments" />} />}

@@ -29,7 +29,11 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     if (!uid) { setProfil(null); return }
     associerUtilisateur(uid)
-    supabase.from('profiles').select('id, role, nom').eq('id', uid).single().then(({ data }) => setProfil(data))
+    supabase.from('profiles').select('id, role, nom').eq('id', uid).single().then(async ({ data }) => {
+      // Administrateur de l'app (vérification des cartes professionnelles) : coach uniquement
+      const admin = data?.role === 'coach' ? (await supabase.rpc('est_admin')).data === true : false
+      setProfil(data ? { ...data, admin } : data)
+    })
   }, [uid])
 
   const finirRecuperation = () => setRecuperation(false)
