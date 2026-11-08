@@ -11,7 +11,7 @@ export const CHAMPS_EX = 'id, nom, sprite, image_url, consigne, consigne_en, lie
 export const chargerProgramme = (aid) => supabase.from('programmes').select('id, nom, description, seances(id, ordre, nom, note, seance_exercices(id, series))')
   .eq('athlete_id', aid).eq('actif', true).maybeSingle()
 export const chargerSeance = (id) => supabase.from('seances')
-  .select(`id, nom, note, programme:programmes(nom, coach_id), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, duree_s, distance_m, intensite, exercice:exercices(${CHAMPS_EX}))`)
+  .select(`id, nom, note, programme:programmes(nom, coach_id), seance_exercices(id, ordre, series, reps, charge_kg, repos_s, note, groupe, duree_s, distance_m, intensite, echauffement_s, exercice:exercices(${CHAMPS_EX}))`)
   .eq('id', id).maybeSingle()
 export const chargerDerniers = (aid) => supabase.from('seances_realisees').select('date, series_realisees(exercice_id, ordre, reps, charge_kg, duree_s, distance_m, fc_moy, rpe)').eq('athlete_id', aid)
   .order('created_at', { ascending: false }).limit(20)

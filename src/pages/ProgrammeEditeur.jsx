@@ -37,7 +37,7 @@ export default function ProgrammeEditeur() {
 
   async function charger() {
     const { data } = await supabase.from('programmes')
-      .select('id, nom, description, prix_eur, jours_entrainement, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe, duree_s, distance_m, intensite))')
+      .select('id, nom, description, prix_eur, jours_entrainement, athlete_id, athlete:profiles!programmes_athlete_id_fkey(nom), seances(id, ordre, nom, note, seance_exercices(id, ordre, exercice_id, series, reps, charge_kg, repos_s, note, groupe, duree_s, distance_m, intensite, echauffement_s))')
       .eq('id', id).single()
     if (!data) return
     setProg(data)
@@ -371,11 +371,14 @@ function ParamsCardio({ l, ex, majLigne }) {
         <label className="field"><span className="label">{l.series > 1 ? 'Récup (s)' : 'Repos après (s)'}</span>
           <input type="number" min="0" step="15" defaultValue={l.repos_s}
             onBlur={(e) => e.target.value !== '' && Number(e.target.value) !== l.repos_s && majLigne(l, { repos_s: Number(e.target.value) })} /></label>
+        <label className="field"><span className="label">Échauffement</span>
+          <input key={`e-${l.id}-${l.echauffement_s}`} type="text" inputMode="decimal" placeholder="Optionnel (min)" defaultValue={dureeSaisie(l.echauffement_s)}
+            onBlur={(e) => { const v = lireDuree(e.target.value); if (v !== l.echauffement_s && (v == null || v <= 7200)) majLigne(l, { echauffement_s: v }) }} /></label>
       </div>
       <input type="text" className="note-ex" aria-label={`Intensité pour ${ex.nom}`} defaultValue={l.intensite ?? ''} maxLength={120}
         placeholder="Intensité : zone 2, FC 130-145, allure 5:30 /km, RPE 7…"
         onBlur={(e) => (e.target.value.trim() || null) !== l.intensite && majLigne(l, { intensite: e.target.value.trim() || null })} />
-      <small className="sub">Durée en minutes (30) ou en minutes:secondes (0:45). Plusieurs blocs = fractionné, avec la récup entre chaque bloc.</small>
+      <small className="sub">Durée en minutes (30) ou en minutes:secondes (0:45). Plusieurs blocs = fractionné, avec la récup entre chaque bloc. L’échauffement, s’il est indiqué, passe avant le premier bloc.</small>
     </>
   )
 }

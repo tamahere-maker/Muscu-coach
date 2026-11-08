@@ -8,7 +8,7 @@ import { CHAMPS_EX, chargerDerniers, chargerMateriel, chargerSeance, chargerVide
 import { enAttente } from '../lib/horsligne'
 import { EcrireAuCoach } from '../lib/Messages'
 import { Video, VideoCoach } from '../lib/VideoExercice'
-import { allureTexte, distanceTexte, duree, estBlocCardio, estCardio, estCardioEx, lireDuree, objectifCardio, remplacantsCardio, resumeBloc, typeAllure } from '../lib/cardio'
+import { allureTexte, distanceTexte, duree, dureeTexte, estBlocCardio, estCardio, estCardioEx, lireDuree, objectifCardio, remplacantsCardio, resumeBloc, typeAllure } from '../lib/cardio'
 
 const chrono = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`
@@ -85,10 +85,10 @@ export default function SeanceGuidee() {
 
   // Chrono cardio : un seul à la fois, { ligne, serie, depuis (0 = en pause), cumul en ms, alerte }
   useEffect(() => {
-    if (!actif?.chrono?.depuis) return
+    if (!actif?.chrono?.depuis && !actif?.echauf?.depuis) return
     const t = setInterval(() => { tic((x) => x + 1); surTic.current?.() }, 500)
     return () => clearInterval(t)
-  }, [actif?.chrono?.depuis])
+  }, [actif?.chrono?.depuis || actif?.echauf?.depuis])
 
   // Le coach a pu modifier la séance pendant qu'elle était en cours : on ajuste les séries gardées
   const incoherent = !!(s && actif && s.lignes.some((l) => actif.sets[l.id]?.length !== l.series))
@@ -168,6 +168,11 @@ export default function SeanceGuidee() {
   const ch = actif.chrono
   const chronoIci = !!ch && ch.ligne === l.id && ch.serie === e.serie
   const ecoule = chronoIci ? ch.cumul + (ch.depuis ? Date.now() - ch.depuis : 0) : 0
+  // Échauffement prévu par le coach : avant le premier bloc, tant qu'il n'est ni fait ni passé
+  const echauffes = actif.echauffes ?? []
+  const avecEchauf = cardio && l.echauffement_s > 0 && e.serie === 0 && !st.fait && !echauffes.includes(l.id)
+  const ech = actif.echauf?.ligne === l.id ? actif.echauf : null
+  const ecouleEch = ech ? ech.cumul + (ech.depuis ? Date.now() - ech.depuis : 0) : 0
   const idxEx = s.lignes.indexOf(l)
   const plusTard = actif.plusTard ?? []
   const nSuiv = prochaineEtape(et, actif.sets, cur, plusTard)
@@ -216,7 +221,20 @@ export default function SeanceGuidee() {
   }
   const remettreAZero = () => maj({ chrono: null })
   // Objectif de durée atteint : vibration ; en fractionné (plusieurs blocs, sans distance), le bloc se valide tout seul
+  // Fin de l'échauffement : au bout du temps, le premier bloc démarre tout seul
+  function finirEchauffement(lancer) {
+    maj({ echauffes: [...echauffes, l.id], echauf: null,
+      ...(lancer ? { chrono: { ligne: l.id, serie: 0, depuis: Date.now(), cumul: 0, alerte: false } } : {}) })
+    if (lancer) toast('Échauffement terminé, c’est parti')
+  }
+  const echauf = {
+    ecoule: ecouleEch, total: (l.echauffement_s ?? 0) * 1000, tourne: !!ech?.depuis,
+    demarrer: () => maj({ echauf: { ligne: l.id, depuis: Date.now(), cumul: ech?.cumul ?? 0 } }),
+    pause: () => maj({ echauf: { ...ech, depuis: 0, cumul: ecouleEch } }),
+    finir: () => finirEchauffement(false),
+  }
   surTic.current = () => {
+    if (avecEchauf && ech?.depuis && ecouleEch >= l.echauffement_s * 1000) { navigator.vibrate?.([300, 100, 300]); finirEchauffement(true); return }
     if (!chronoIci || !ch.depuis || !objectifMs || ch.alerte || ecoule < objectifMs) return
     navigator.vibrate?.([300, 100, 300])
     if (l.series > 1 && !l.distance_m) { valider(true); return }
@@ -355,7 +373,7 @@ export default function SeanceGuidee() {
           {profil.role !== 'coach' && <EcrireAuCoach exercice={ex} seanceId={s.id} />}
         </div>
         <div className="card setcard">
-          {cardio ? <BlocCardio l={l} ex={ex} e={e} st={st} majSerie={majSerie} precedent={precedent(l, e.serie)}
+          {avecEchauf ? <Echauffement l={l} echauf={echauf} /> : cardio ? <BlocCardio l={l} ex={ex} e={e} st={st} majSerie={majSerie} precedent={precedent(l, e.serie)}
             chrono={{ ecoule, objectifMs, tourne: chronoIci && !!ch.depuis, demarrer, pause, remettreAZero }} /> : <>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2 style={{ margin: 0 }}>Série {e.serie + 1} / {l.series}</h2>
@@ -372,7 +390,7 @@ export default function SeanceGuidee() {
                 <input type="number" inputMode="decimal" step="0.5" value={st.kg} onChange={(x) => majSerie({ kg: x.target.value })} aria-label="Charge" />
                 <button type="button" onClick={() => pas('kg', 2.5)} aria-label="Plus de charge">+</button></div></div>
           </div></>}
-          <button className="btn big-btn" onClick={() => valider()}>{cardio ? (st.fait ? 'Corriger le bloc ✓' : l.series > 1 ? 'Valider le bloc ✓' : 'Valider ✓') : st.fait ? 'Corriger la série ✓' : 'Valider la série ✓'}</button>
+          {!avecEchauf && <button className="btn big-btn" onClick={() => valider()}>{cardio ? (st.fait ? 'Corriger le bloc ✓' : l.series > 1 ? 'Valider le bloc ✓' : 'Valider ✓') : st.fait ? 'Corriger la série ✓' : 'Valider la série ✓'}</button>}
           <div className="setlist">
             {actif.sets[l.id].map((z, k) => (
               <div key={k} className={`${z.fait ? 'ok' : ''} ${k === e.serie ? 'cur' : ''}`} onClick={() => allerA(l.id, et.findIndex((x) => x.ligne === l.id && x.serie === k))}>
@@ -453,7 +471,7 @@ function BlocCardio({ l, ex, e, st, majSerie, precedent, chrono }) {
     <>
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <h2 style={{ margin: 0 }}>{l.series > 1 ? `Bloc ${e.serie + 1} / ${l.series}` : 'Cardio'}</h2>
-        <span className="pill num">{objectifCardio({ ...l, series: 1 })}</span>
+        <span className="pill num">{objectifCardio({ ...l, series: 1, echauffement_s: null })}</span>
       </div>
       {precedent && estBlocCardio(precedent) && <span className="sub">Dernière fois : {resumeBloc(ex, precedent)}</span>}
       <div className="chrono-cardio">
@@ -479,6 +497,30 @@ function BlocCardio({ l, ex, e, st, majSerie, precedent, chrono }) {
           <input type="number" inputMode="numeric" min="1" max="10" placeholder="1 facile, 10 à fond" value={st.rpe} onChange={(x) => majSerie({ rpe: x.target.value })} aria-label="Ressenti de 1 à 10" /></label>
       </div>
       {allure && <span className="sub">Allure : <strong className="num">{allure}</strong>{z.distance_m ? ` sur ${distanceTexte(z.distance_m)}` : ''}</span>}
+    </>
+  )
+}
+
+// Échauffement avant le premier bloc : compte à rebours, puis le bloc démarre tout seul
+function Echauffement({ l, echauf }) {
+  const { ecoule, total, tourne, demarrer, pause, finir } = echauf
+  const reste = Math.max(0, total - ecoule)
+  return (
+    <>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>Échauffement</h2>
+        <span className="pill num">{dureeTexte(l.echauffement_s)}</span>
+      </div>
+      <span className="sub">À allure tranquille avant {l.series > 1 ? 'le premier bloc' : 'l’effort'} ({objectifCardio({ ...l, echauffement_s: null })}). À la fin du temps, le chrono {l.series > 1 ? 'du premier bloc' : ''} démarre tout seul.</span>
+      <div className="chrono-cardio">
+        <div className="t num">{duree(Math.ceil(reste / 1000))}</div>
+        <div className="progress" aria-hidden="true"><i style={{ width: `${Math.min(100, (ecoule / total) * 100)}%` }} /></div>
+        <div className="row" style={{ justifyContent: 'center' }}>
+          {tourne ? <button className="btn" onClick={pause}>Pause</button>
+            : <button className="btn" onClick={demarrer}>{ecoule ? 'Reprendre' : 'Démarrer l’échauffement'}</button>}
+        </div>
+      </div>
+      <button className="btn ghost big-btn" onClick={finir}>{ecoule ? 'Échauffement fait, passer à l’effort' : 'Passer l’échauffement'}</button>
     </>
   )
 }
