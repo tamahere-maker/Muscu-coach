@@ -64,6 +64,7 @@ export const meilleureAllure = (ex, a, b) => (typeAllure(ex) === 'kmh' ? a > b :
 // Objectif d'une ligne de séance cardio, en texte : « 8 × 30 s · récup 90 s · Zone 4 »
 export function objectifCardio(l) {
   const parts = []
+  if (l.echauffement_s) parts.push(`échauffement ${dureeTexte(l.echauffement_s)}`)
   const bloc = [l.duree_s ? dureeTexte(l.duree_s) : '', l.distance_m ? distanceTexte(l.distance_m) : ''].filter(Boolean).join(' ou ')
   parts.push(l.series > 1 ? `${l.series} × ${bloc || 'bloc'}` : bloc || 'Durée libre')
   if (l.series > 1 && l.repos_s) parts.push(`récup ${dureeTexte(l.repos_s)}`)
