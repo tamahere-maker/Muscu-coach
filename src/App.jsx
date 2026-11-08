@@ -13,6 +13,7 @@ import AthleteProfil from './pages/AthleteProfil'
 import SeanceGuidee from './pages/SeanceGuidee'
 import Bibliotheque from './pages/Bibliotheque'
 import { Icone } from './lib/icones'
+import { Avatar } from './lib/PhotoProfil'
 import Programmes from './pages/Programmes'
 import ProgrammeEditeur from './pages/ProgrammeEditeur'
 import Plans from './pages/Plans'
@@ -74,11 +75,10 @@ export default function App() {
         <div className="top-in">
           <div className="brand">Muscu <b>Coach</b></div>
           <span className="spacer" />
-          {profil && !choixMdp && (profil.role === 'coach'
-            ? <Link className="who" to="/compte">{profil.nom || session.user.email} · Mon compte</Link>
-            : <>
-              <Link className="who" to="/profil">{profil.nom || session.user.email} · Mon profil</Link>
-            </>)}
+          {profil && !choixMdp && (
+            <Link className="who-photo" to="/compte" aria-label={`Mon compte (${profil.nom || session.user.email})`} title={`${profil.nom || session.user.email} · Mon compte`}>
+              <Avatar chemin={profil.photo} nom={profil.nom || session.user.email} />
+            </Link>)}
           {session && <button className="btn ghost sm" onClick={deconnexion}>Déconnexion</button>}
         </div>
         {profil && !choixMdp && (
