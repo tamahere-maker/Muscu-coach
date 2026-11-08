@@ -29,7 +29,9 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     if (!uid) { setProfil(null); return }
     associerUtilisateur(uid)
-    supabase.from('profiles').select('id, role, nom').eq('id', uid).single().then(async ({ data }) => {
+    // Repli sans la photo si la colonne n'existe pas encore en base (migration 030 pas appliquée)
+    const lire = (cols) => supabase.from('profiles').select(cols).eq('id', uid).single()
+    lire('id, role, nom, photo').then((r) => (r.error && !r.data ? lire('id, role, nom') : r)).then(async ({ data }) => {
       // Administrateur de l'app (vérification des cartes professionnelles) : coach uniquement
       const admin = data?.role === 'coach' ? (await supabase.rpc('est_admin')).data === true : false
       setProfil(data ? { ...data, admin } : data)

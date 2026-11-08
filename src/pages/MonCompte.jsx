@@ -7,6 +7,7 @@ import { ChampMdp, IdentifiantCache, estSolide, memoriserIdentifiants, traduire 
 import { CarteApplication } from '../lib/pwa'
 import { CarteNotifications } from '../lib/Messages'
 import { BadgeCarte, useCartePro } from '../lib/cartePro'
+import { CartePhoto } from '../lib/PhotoProfil'
 
 // Compte de connexion, commun au coach et à l'athlète : nom, adresse e-mail et mot de passe
 export default function MonCompte() {
@@ -65,7 +66,10 @@ export default function MonCompte() {
       <div>
         <h1>Mon compte</h1>
         <p className="sub">Connecté avec {email}.</p>
+        {profil.role === 'athlete' && <p className="sub"><Link className="linkbtn" to="/profil">Mon profil : mesures, bilans, coachs et contrats →</Link></p>}
       </div>
+
+      <CartePhoto />
 
       <form className="card" onSubmit={enregistrerNom}>
         <h2>Nom</h2>

@@ -31,6 +31,17 @@ button{cursor:pointer}
 .seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
 .spacer{flex:1}
 .who{font-size:13px;color:var(--muted)}
+.who-photo{display:inline-flex;text-decoration:none;border-radius:50%;outline-offset:2px}
+.who-photo:hover .avatar{box-shadow:0 0 0 2px var(--accent)}
+.avatar{display:inline-grid;place-items:center;flex:none;border-radius:50%;overflow:hidden;background:var(--surface-2);border:1px solid var(--line);color:var(--ink);font-weight:700;letter-spacing:.02em;line-height:1;user-select:none}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-profil{display:flex;gap:14px;align-items:center}
+.dlg-recadrage{width:min(360px,calc(100vw - 32px))}
+.recadrage{position:relative;margin:0 auto;border-radius:10px;overflow:hidden;background:#111;max-width:100%}
+.recadrage canvas{display:block;touch-action:none;cursor:grab}
+.recadrage canvas:active{cursor:grabbing}
+.recadrage-cercle{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.5);border:2px solid rgba(255,255,255,.85);pointer-events:none}
+.recadrage-zoom input{width:100%}
 .who select{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:4px 8px;color:var(--ink)}
 nav.tabs{max-width:960px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;gap:4px;overflow-x:auto}
 nav.tabs button{border:0;background:none;padding:10px 12px;font-weight:600;color:var(--muted);border-bottom:3px solid transparent;white-space:nowrap}
