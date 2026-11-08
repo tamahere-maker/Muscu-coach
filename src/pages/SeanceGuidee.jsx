@@ -8,9 +8,23 @@ import { CHAMPS_EX, chargerDerniers, chargerMateriel, chargerSeance, chargerVide
 import { enAttente } from '../lib/horsligne'
 import { EcrireAuCoach } from '../lib/Messages'
 import { Video, VideoCoach } from '../lib/VideoExercice'
+import { allureTexte, distanceTexte, duree, estBlocCardio, estCardio, estCardioEx, lireDuree, objectifCardio, remplacantsCardio, resumeBloc, typeAllure } from '../lib/cardio'
 
 const chrono = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 const pluriel = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`
+
+// Saisie d'un bloc cardio : texte tel qu'affiché dans les champs (durée « m:ss », distance en km ou en m pour la natation)
+const enMetres = (ex) => typeAllure(ex) === '100m'
+const distSaisie = (ex, m) => (m == null || m === '' ? '' : enMetres(ex) ? String(m) : String(m / 1000).replace('.', ','))
+const lireDist = (ex, t) => { const v = Number(String(t ?? '').trim().replace(',', '.')); return String(t ?? '').trim() && v > 0 ? Math.round(enMetres(ex) ? v : v * 1000) : null }
+const borne = (v, a, b) => { const n = Math.round(Number(v)); return String(v ?? '').trim() && n >= a && n <= b ? n : null }
+// Bloc saisi → valeurs enregistrées (comme dans series_realisees)
+const blocFait = (ex, z) => ({ duree_s: lireDuree(z.duree), distance_m: lireDist(ex, z.dist), fc_moy: borne(z.fc, 30, 250), rpe: borne(z.rpe, 1, 10) })
+// Valeurs de départ d'une série : la dernière fois pour la muscu, l'objectif du coach pour le cardio
+function serieDepart(l, p) {
+  if (estCardio(l)) return { duree: l.duree_s ? duree(l.duree_s) : '', dist: distSaisie(l.exercice, l.distance_m), fc: '', rpe: '', fait: false }
+  return { reps: p?.reps ?? l.reps, kg: Number(p?.charge_kg ?? l.charge_kg), fait: false }
+}
 
 // Séance guidée : aperçu avec les notes du coach, puis série par série avec repos automatique
 export default function SeanceGuidee() {
@@ -27,6 +41,8 @@ export default function SeanceGuidee() {
   const [videos, setVideos] = useState({}) // exercice_id → vidéo du coach
   const [envoi, setEnvoi] = useState(false)
   const dlg = useRef()
+  const surTic = useRef() // vérifie l'objectif du chrono cardio
+  const finRepos = useRef() // relance le chrono au bloc suivant d'un fractionné
 
   useEffect(() => {
     chargerSeance(id).then(({ data }) => setS(data && { ...data, lignes: [...data.seance_exercices].sort((a, b) => a.ordre - b.ordre) }))
@@ -62,17 +78,24 @@ export default function SeanceGuidee() {
   useEffect(() => {
     if (!actif?.repos) return
     const t = setInterval(() => {
-      if (Date.now() >= actif.repos) { navigator.vibrate?.([200, 100, 200]); maj({ repos: 0 }) } else tic((x) => x + 1)
+      if (Date.now() >= actif.repos) { navigator.vibrate?.([200, 100, 200]); maj({ repos: 0 }); finRepos.current?.() } else tic((x) => x + 1)
     }, 500)
     return () => clearInterval(t)
   }, [actif?.repos])
+
+  // Chrono cardio : un seul à la fois, { ligne, serie, depuis (0 = en pause), cumul en ms, alerte }
+  useEffect(() => {
+    if (!actif?.chrono?.depuis) return
+    const t = setInterval(() => { tic((x) => x + 1); surTic.current?.() }, 500)
+    return () => clearInterval(t)
+  }, [actif?.chrono?.depuis])
 
   // Le coach a pu modifier la séance pendant qu'elle était en cours : on ajuste les séries gardées
   const incoherent = !!(s && actif && s.lignes.some((l) => actif.sets[l.id]?.length !== l.series))
   useEffect(() => {
     if (!incoherent) return
     maj({ sets: Object.fromEntries(s.lignes.map((l) => [l.id, Array.from({ length: l.series }, (_, k) =>
-      actif.sets[l.id]?.[k] ?? { reps: l.reps, kg: Number(l.charge_kg), fait: false })])) })
+      actif.sets[l.id]?.[k] ?? serieDepart(l))])) })
   }, [incoherent])
 
   function maj(patch) {
@@ -87,10 +110,7 @@ export default function SeanceGuidee() {
   const precedent = (l, k) => derniers[exDe(l).id]?.[k]
 
   function commencer() {
-    const sets = Object.fromEntries(s.lignes.map((l) => [l.id, Array.from({ length: l.series }, (_, k) => {
-      const p = derniers[l.exercice.id]?.[k]
-      return { reps: p?.reps ?? l.reps, kg: Number(p?.charge_kg ?? l.charge_kg), fait: false }
-    })]))
+    const sets = Object.fromEntries(s.lignes.map((l) => [l.id, Array.from({ length: l.series }, (_, k) => serieDepart(l, derniers[l.exercice.id]?.[k]))]))
     const r = { seance: id, debut: Date.now(), cur: 0, sets, rempl: {}, repos: 0 }
     garderEnCours(r); setRun(r); window.scrollTo(0, 0)
   }
@@ -116,8 +136,11 @@ export default function SeanceGuidee() {
                 <Anim ex={l.exercice} cls="t" />
                 <div style={{ minWidth: 0 }}>
                   <h3 style={{ margin: 0 }}>{i + 1}. {l.exercice.nom}{ss && <span className="pill acc" style={{ marginLeft: 6 }}>Superset</span>}</h3>
+                  {estCardio(l) ? (
+                    <span className="sub">{objectifCardio(l)}{p && estBlocCardio(p) ? ` · dernière fois ${resumeBloc(l.exercice, p)}` : ''}</span>
+                  ) : (
                   <span className="sub">{l.series} × {l.reps}{Number(l.charge_kg) ? ` · ${fmt(l.charge_kg, 1)} kg` : ''} · repos {l.repos_s} s
-                    {p ? ` · dernière fois ${p.reps} × ${fmt(p.charge_kg, 1)} kg` : ''}</span>
+                    {p ? ` · dernière fois ${p.reps} × ${fmt(p.charge_kg, 1)} kg` : ''}</span>)}
                   {l.note && <p className="consigne">{l.note}</p>}
                 </div>
               </div>
@@ -141,6 +164,10 @@ export default function SeanceGuidee() {
   const l = ligneDe(e)
   const ex = exDe(l)
   const st = actif.sets[l.id][e.serie]
+  const cardio = estCardio(l)
+  const ch = actif.chrono
+  const chronoIci = !!ch && ch.ligne === l.id && ch.serie === e.serie
+  const ecoule = chronoIci ? ch.cumul + (ch.depuis ? Date.now() - ch.depuis : 0) : 0
   const idxEx = s.lignes.indexOf(l)
   const plusTard = actif.plusTard ?? []
   const nSuiv = prochaineEtape(et, actif.sets, cur, plusTard)
@@ -152,19 +179,55 @@ export default function SeanceGuidee() {
   const majSerie = (patch) => maj({ sets: { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, ...patch } : x)) } })
   const pas = (k, d) => majSerie({ [k]: Math.max(0, Math.round((Number(st[k]) + d) * 10) / 10) })
 
-  function valider() {
-    // Les séries suivantes de l'exercice reprennent la charge et les répétitions qu'on vient de faire
-    const sets = { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, fait: true }
-      : k > e.serie && !x.fait ? { ...x, reps: st.reps, kg: st.kg } : x)) }
+  function valider(auto = false) {
+    // Les séries suivantes de l'exercice reprennent la charge et les répétitions qu'on vient de faire.
+    // En cardio, un chrono qui tourne donne la durée du bloc.
+    const temps = chronoIci && ch.depuis ? { duree: duree(Math.round(ecoule / 1000)) } : {}
+    const sets = { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, ...temps, fait: true }
+      : !cardio && k > e.serie && !x.fait ? { ...x, reps: st.reps, kg: st.kg } : x)) }
     const pt = sansBloc(plusTard)
     const prochain = prochaineEtape(et, sets, cur, pt)
     const termine = prochain < 0
     // Dans un superset, on enchaîne sans repos ; on repose après le dernier exercice du tour
     const r = !termine && e.repos > 0 ? Date.now() + e.repos * 1000 : 0
-    maj({ sets, cur: termine ? cur : prochain, repos: r, plusTard: pt })
+    // Fractionné validé par le chrono : le bloc suivant repartira tout seul après la récup
+    // (ou tout de suite s'il n'y a pas de récup)
+    const enchaine = auto && !termine && estCardio(ligneDe(et[prochain]))
+    const chrono = !chronoIci ? ch : enchaine && !r ? { ligne: et[prochain].ligne, serie: et[prochain].serie, depuis: Date.now(), cumul: 0, alerte: false } : null
+    maj({ sets, cur: termine ? cur : prochain, repos: r, plusTard: pt, chrono, relance: enchaine && r > 0 })
     if (!termine && e.repos === 0 && e.superset) toast(`Enchaîne : ${exDe(ligneDe(et[prochain])).nom}`)
     else if (!termine && pt.includes(et[prochain].ligne)) toast(`On revient à ${exDe(ligneDe(et[prochain])).nom}, que tu avais passé`)
     window.scrollTo(0, 0)
+  }
+
+  // ----- Chrono cardio -----
+  const objectifMs = cardio && l.duree_s ? l.duree_s * 1000 : 0
+  function demarrer() {
+    // Un chrono lancé sur un autre bloc est mis en pause et sa durée gardée dans ce bloc
+    let sets = actif.sets
+    if (ch && !chronoIci) {
+      const t = ch.cumul + (ch.depuis ? Date.now() - ch.depuis : 0)
+      if (t > 0) sets = { ...sets, [ch.ligne]: sets[ch.ligne].map((x, k) => (k === ch.serie ? { ...x, duree: duree(Math.round(t / 1000)) } : x)) }
+    }
+    maj({ sets, chrono: { ligne: l.id, serie: e.serie, depuis: Date.now(), cumul: chronoIci ? ch.cumul : 0, alerte: chronoIci && ch.alerte } })
+  }
+  function pause() {
+    maj({ chrono: { ...ch, depuis: 0, cumul: ecoule }, sets: { ...actif.sets, [l.id]: actif.sets[l.id].map((x, k) => (k === e.serie ? { ...x, duree: duree(Math.round(ecoule / 1000)) } : x)) } })
+  }
+  const remettreAZero = () => maj({ chrono: null })
+  // Objectif de durée atteint : vibration ; en fractionné (plusieurs blocs, sans distance), le bloc se valide tout seul
+  surTic.current = () => {
+    if (!chronoIci || !ch.depuis || !objectifMs || ch.alerte || ecoule < objectifMs) return
+    navigator.vibrate?.([300, 100, 300])
+    if (l.series > 1 && !l.distance_m) { valider(true); return }
+    maj({ chrono: { ...ch, alerte: true } })
+    toast('Objectif de durée atteint')
+  }
+  finRepos.current = () => {
+    if (!actif.relance) return
+    const lr = ligneDe(e)
+    if (estCardio(lr)) maj({ relance: false, chrono: { ligne: lr.id, serie: e.serie, depuis: Date.now(), cumul: 0, alerte: false } })
+    else maj({ relance: false })
   }
 
   // Machine prise : on passe tout l'exercice (ou le superset) et on y reviendra à la fin
@@ -184,15 +247,18 @@ export default function SeanceGuidee() {
 
   async function ouvrirRempl() {
     const e0 = l.exercice.id
+    const enCardio = estCardioEx(l.exercice)
     const [{ data }, { data: liens }] = await Promise.all([
-      supabase.from('exercices').select(CHAMPS_EX).contains('muscles', [l.exercice.muscles?.[0] ?? '']).limit(300),
+      enCardio ? supabase.from('exercices').select(CHAMPS_EX).eq('categorie', 'Cardio').limit(300)
+        : supabase.from('exercices').select(CHAMPS_EX).contains('muscles', [l.exercice.muscles?.[0] ?? '']).limit(300),
       supabase.from('variantes_exercices').select('exercice_a, exercice_b').or(`exercice_a.eq.${e0},exercice_b.eq.${e0}`),
     ])
     // Variantes liées par le coach d'abord, puis les équivalents trouvés automatiquement
     const idsVar = [...new Set((liens ?? []).map((x) => (x.exercice_a === e0 ? x.exercice_b : x.exercice_a)))]
     const { data: vars } = idsVar.length ? await supabase.from('exercices').select(CHAMPS_EX).in('id', idsVar) : { data: [] }
     const variantes = vars ?? []
-    setChoixRempl({ variantes, autres: remplacants(l.exercice, data ?? [], materiel).filter((x) => !idsVar.includes(x.id)) })
+    const autres = enCardio ? remplacantsCardio(l.exercice, data ?? []) : remplacants(l.exercice, data ?? [], materiel)
+    setChoixRempl({ variantes, autres: autres.filter((x) => !idsVar.includes(x.id)) })
     dlg.current.showModal()
   }
   function remplacer(x) {
@@ -201,7 +267,7 @@ export default function SeanceGuidee() {
     // Charges reprises de la dernière fois avec ce nouvel exercice, si elles existent
     const sets = { ...actif.sets, [l.id]: actif.sets[l.id].map((z, k) => {
       const p = derniers[x.id]?.[k]
-      return z.fait || !p ? z : { ...z, reps: p.reps, kg: Number(p.charge_kg) }
+      return z.fait || !p || cardio ? z : { ...z, reps: p.reps, kg: Number(p.charge_kg) }
     }) }
     maj({ rempl, sets }); dlg.current.close()
     toast(x.id === l.exercice.id ? 'Exercice prévu rétabli' : `Remplacé par ${x.nom}`)
@@ -220,7 +286,9 @@ export default function SeanceGuidee() {
     if (error) { setEnvoi(false); toast(error.message); return }
     const lignes = lignesFaites.map(({ li, z }, ordre) => {
       const x = exDe(li)
-      return { id: crypto.randomUUID(), seance_realisee_id: srId, exercice_id: x.id, exercice_prevu_id: x.id === li.exercice.id ? null : li.exercice.id, ordre, reps: Number(z.reps) || 0, charge_kg: Number(z.kg) || 0 }
+      const base = { id: crypto.randomUUID(), seance_realisee_id: srId, exercice_id: x.id, exercice_prevu_id: x.id === li.exercice.id ? null : li.exercice.id, ordre }
+      return estCardio(li) ? { ...base, reps: 0, charge_kg: 0, ...blocFait(x, z) }
+        : { ...base, reps: Number(z.reps) || 0, charge_kg: Number(z.kg) || 0, duree_s: null, distance_m: null, fc_moy: null, rpe: null }
     })
     const { error: e2 } = await supabase.from('series_realisees').insert(lignes)
     if (e2) {
@@ -254,8 +322,8 @@ export default function SeanceGuidee() {
 
       {repos > 0 && (
         <div className="resting">
-          <div><span className="label" style={{ color: 'inherit', opacity: 0.7 }}>Repos</span><div className="t num">{chrono(repos)}</div></div>
-          <span>Ensuite : {ex.nom} · série {e.serie + 1}</span>
+          <div><span className="label" style={{ color: 'inherit', opacity: 0.7 }}>{cardio ? 'Récupération' : 'Repos'}</span><div className="t num">{chrono(repos)}</div></div>
+          <span>Ensuite : {ex.nom} · {cardio ? 'bloc' : 'série'} {e.serie + 1}{cardio && actif.relance ? ' (le chrono repartira tout seul)' : ''}</span>
           <div className="row">
             <button onClick={() => maj({ repos: actif.repos + 30000 })}>+30 s</button>
             <button onClick={() => maj({ repos: 0 })}>Passer</button>
@@ -287,6 +355,8 @@ export default function SeanceGuidee() {
           {profil.role !== 'coach' && <EcrireAuCoach exercice={ex} seanceId={s.id} />}
         </div>
         <div className="card setcard">
+          {cardio ? <BlocCardio l={l} ex={ex} e={e} st={st} majSerie={majSerie} precedent={precedent(l, e.serie)}
+            chrono={{ ecoule, objectifMs, tourne: chronoIci && !!ch.depuis, demarrer, pause, remettreAZero }} /> : <>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2 style={{ margin: 0 }}>Série {e.serie + 1} / {l.series}</h2>
             <span className="pill num">Objectif {l.reps} reps{e.repos ? ` · repos ${e.repos} s` : ''}</span>
@@ -301,12 +371,12 @@ export default function SeanceGuidee() {
               <div className="stepper"><button type="button" onClick={() => pas('kg', -2.5)} aria-label="Moins de charge">−</button>
                 <input type="number" inputMode="decimal" step="0.5" value={st.kg} onChange={(x) => majSerie({ kg: x.target.value })} aria-label="Charge" />
                 <button type="button" onClick={() => pas('kg', 2.5)} aria-label="Plus de charge">+</button></div></div>
-          </div>
-          <button className="btn big-btn" onClick={valider}>{st.fait ? 'Corriger la série ✓' : 'Valider la série ✓'}</button>
+          </div></>}
+          <button className="btn big-btn" onClick={() => valider()}>{cardio ? (st.fait ? 'Corriger le bloc ✓' : l.series > 1 ? 'Valider le bloc ✓' : 'Valider ✓') : st.fait ? 'Corriger la série ✓' : 'Valider la série ✓'}</button>
           <div className="setlist">
             {actif.sets[l.id].map((z, k) => (
               <div key={k} className={`${z.fait ? 'ok' : ''} ${k === e.serie ? 'cur' : ''}`} onClick={() => allerA(l.id, et.findIndex((x) => x.ligne === l.id && x.serie === k))}>
-                <span>Série {k + 1}</span><span>{z.reps} reps × {fmt(z.kg || 0, 1)} kg</span><span className="tick">{z.fait ? '✓' : ''}</span>
+                <span>{cardio ? 'Bloc' : 'Série'} {k + 1}</span><span>{cardio ? resumeBloc(ex, blocFait(ex, z)) || '—' : `${z.reps} reps × ${fmt(z.kg || 0, 1)} kg`}</span><span className="tick">{z.fait ? '✓' : ''}</span>
               </div>
             ))}
           </div>
@@ -329,7 +399,7 @@ export default function SeanceGuidee() {
             return (
               <button key={li.id} className="sub-item" onClick={() => { allerA(li.id, premier >= 0 ? premier : et.findIndex((x) => x.ligne === li.id)); window.scrollTo(0, 0) }}>
                 <Anim ex={exDe(li)} cls="s" />
-                <span><strong>{i + 1}. {exDe(li).nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>{ok} / {li.series} séries faites</span></span>
+                <span><strong>{i + 1}. {exDe(li).nom}</strong><br /><span className="sub" style={{ fontSize: 12 }}>{ok} / {li.series} {estCardio(li) ? 'blocs faits' : 'séries faites'}</span></span>
                 <span className={`pill ${ok === li.series ? 'ok' : li.id === l.id ? 'acc' : passe ? 'warn' : ''}`}>{ok === li.series ? 'Fait' : li.id === l.id ? 'En cours' : passe ? 'Plus tard' : 'Aller'}</span>
               </button>
             )
@@ -370,5 +440,45 @@ export default function SeanceGuidee() {
         )}
       </dialog>
     </div>
+  )
+}
+
+// Bloc cardio en séance : chrono, puis durée, distance, fréquence cardiaque moyenne et ressenti (RPE)
+function BlocCardio({ l, ex, e, st, majSerie, precedent, chrono }) {
+  const { ecoule, objectifMs, tourne, demarrer, pause, remettreAZero } = chrono
+  const z = blocFait(ex, st)
+  const allure = allureTexte(ex, z.duree_s, z.distance_m)
+  const reste = objectifMs ? Math.max(0, objectifMs - ecoule) : 0
+  return (
+    <>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <h2 style={{ margin: 0 }}>{l.series > 1 ? `Bloc ${e.serie + 1} / ${l.series}` : 'Cardio'}</h2>
+        <span className="pill num">{objectifCardio({ ...l, series: 1 })}</span>
+      </div>
+      {precedent && estBlocCardio(precedent) && <span className="sub">Dernière fois : {resumeBloc(ex, precedent)}</span>}
+      <div className="chrono-cardio">
+        <div className="t num">{duree(Math.floor(ecoule / 1000))}</div>
+        {objectifMs > 0 && <>
+          <div className="progress" aria-hidden="true"><i style={{ width: `${Math.min(100, (ecoule / objectifMs) * 100)}%` }} /></div>
+          <span className="sub">{reste > 0 ? `Reste ${duree(Math.ceil(reste / 1000))}` : 'Objectif atteint'}</span>
+        </>}
+        <div className="row" style={{ justifyContent: 'center' }}>
+          {tourne ? <button className="btn" onClick={pause}>Pause</button>
+            : <button className="btn" onClick={demarrer}>{ecoule ? 'Reprendre' : 'Démarrer le chrono'}</button>}
+          {!tourne && ecoule > 0 && <button className="btn ghost" onClick={remettreAZero}>Remettre à zéro</button>}
+        </div>
+      </div>
+      <div className="grid2 saisie-cardio">
+        <label className="field"><span className="label">Durée</span>
+          <input type="text" inputMode="numeric" placeholder="m:ss" value={st.duree} onChange={(x) => majSerie({ duree: x.target.value })} aria-label="Durée" /></label>
+        <label className="field"><span className="label">Distance ({enMetres(ex) ? 'm' : 'km'})</span>
+          <input type="text" inputMode="decimal" placeholder="Optionnel" value={st.dist} onChange={(x) => majSerie({ dist: x.target.value })} aria-label="Distance" /></label>
+        <label className="field"><span className="label">FC moyenne</span>
+          <input type="number" inputMode="numeric" min="30" max="250" placeholder="bpm" value={st.fc} onChange={(x) => majSerie({ fc: x.target.value })} aria-label="Fréquence cardiaque moyenne" /></label>
+        <label className="field"><span className="label">Ressenti (RPE 1 à 10)</span>
+          <input type="number" inputMode="numeric" min="1" max="10" placeholder="1 facile, 10 à fond" value={st.rpe} onChange={(x) => majSerie({ rpe: x.target.value })} aria-label="Ressenti de 1 à 10" /></label>
+      </div>
+      {allure && <span className="sub">Allure : <strong className="num">{allure}</strong>{z.distance_m ? ` sur ${distanceTexte(z.distance_m)}` : ''}</span>}
+    </>
   )
 }
