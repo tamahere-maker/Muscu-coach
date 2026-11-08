@@ -8,6 +8,10 @@ import { supabase } from './supabase'
 export const LIEN_REGISTRE = 'https://eapspublic.sports.gouv.fr'
 export const CGU_VERSION = 1
 export const JOURS_RAPPEL = 60
+// Interrupteur : false pendant la phase de test (demande du 2026-11-08), l'envoi de contrat n'exige pas de carte.
+// Pour rétablir l'obligation : passer à true ET, en base,
+// alter policy contrats_carte_pro on public.contrats with check (public.carte_valide(coach_id));
+export const CARTE_OBLIGATOIRE = false
 export const DIPLOMES = [
   'CQP Instructeur fitness, option Musculation et personal training',
   'CQP Instructeur fitness, option Cours collectifs',
@@ -34,6 +38,7 @@ export function etatCarte(c) {
 }
 // Carte utilisable pour envoyer un contrat (même règle que carte_valide côté base)
 export const carteValide = (c) => !['absente', 'incomplete', 'expiree'].includes(etatCarte(c).code)
+export const peutEnvoyerContrat = (c) => !CARTE_OBLIGATOIRE || carteValide(c)
 
 export function useCartePro(coachId) {
   const [carte, setCarte] = useState(undefined)
@@ -55,9 +60,9 @@ export function BandeauCarte({ carte }) {
   const e = etatCarte(carte)
   if (e.code === 'verifiee' || e.code === 'a_verifier') return null
   const texte = {
-    absente: 'Pour coacher contre rémunération, même à distance, la loi impose un diplôme reconnu et une carte professionnelle. Renseigne la tienne : sans elle, tu ne peux pas envoyer de contrat.',
-    incomplete: 'Accepte la déclaration sur l’honneur et les CGU coach pour pouvoir envoyer des contrats.',
-    expiree: 'Ta carte a expiré : renouvelle ta déclaration sur eaps.sports.gouv.fr puis mets à jour la date. L’envoi de contrats est bloqué en attendant.',
+    absente: `Pour coacher contre rémunération, même à distance, la loi impose un diplôme reconnu et une carte professionnelle. Renseigne la tienne${CARTE_OBLIGATOIRE ? ' : sans elle, tu ne peux pas envoyer de contrat' : ''}.`,
+    incomplete: `Accepte la déclaration sur l’honneur et les CGU coach${CARTE_OBLIGATOIRE ? ' pour pouvoir envoyer des contrats' : ''}.`,
+    expiree: `Ta carte a expiré : renouvelle ta déclaration sur eaps.sports.gouv.fr puis mets à jour la date.${CARTE_OBLIGATOIRE ? ' L’envoi de contrats est bloqué en attendant.' : ''}`,
     refusee: `Ta carte n’a pas pu être vérifiée : ${carte?.refus_motif}. Corrige le numéro ou le diplôme.`,
     bientot: `Ta carte expire dans ${joursRestants(carte?.expire_le ?? '')} jours : pense à renouveler ta déclaration sur eaps.sports.gouv.fr.`,
   }[e.code]
