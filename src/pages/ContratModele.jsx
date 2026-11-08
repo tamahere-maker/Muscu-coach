@@ -4,7 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { toast } from '../lib/ui'
 import { CHAMPS_REQUIS, TexteContrat, genererTexte, manquants } from '../lib/contrat'
-import { BadgeCarte, carteValide, dateFr, useCartePro } from '../lib/cartePro'
+import { BadgeCarte, dateFr, peutEnvoyerContrat, useCartePro } from '../lib/cartePro'
 
 const VIDE = { denomination: '', statut_juridique: '', siret: '', adresse: '', email_contact: '', diplome: '', assurance: '', mediateur: '',
   delai_reponse: '48 heures ouvrées', preavis_jours: 15, clauses_perso: '', version: 0 }
@@ -70,7 +70,7 @@ export default function ContratModele() {
         </div>
         <label className="field"><span className="label">Conditions particulières (facultatif)</span>
           <textarea rows="4" value={m.clauses_perso} onChange={maj('clauses_perso')} placeholder="Ex. : séances en visio incluses, modalités de paiement…" /></label>
-        {carte !== undefined && !carteValide(carte) && <p className="sub" style={{ margin: 0 }}>Renseigne une carte professionnelle en cours de validité avant d’envoyer un contrat.</p>}
+        {carte !== undefined && !peutEnvoyerContrat(carte) && <p className="sub" style={{ margin: 0 }}>Renseigne une carte professionnelle en cours de validité avant d’envoyer un contrat.</p>}
         {manque.length > 0 && <p className="sub" style={{ margin: 0 }}>À compléter avant d’envoyer un contrat : {manque.join(', ')}.</p>}
         <div className="row">
           <button className="btn">Enregistrer</button>

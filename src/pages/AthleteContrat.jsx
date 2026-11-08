@@ -4,7 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, jourIso, toast } from '../lib/ui'
 import { STATUTS, TexteContrat, genererTexte, manquants } from '../lib/contrat'
-import { carteValide, etatCarte, useCartePro } from '../lib/cartePro'
+import { etatCarte, peutEnvoyerContrat, useCartePro } from '../lib/cartePro'
 
 const dateFr = (d) => new Date(d).toLocaleDateString('fr-FR')
 
@@ -86,7 +86,7 @@ export default function AthleteContrat({ id, nom, programme }) {
         )}
       </div>
 
-      {principal && (!carteValide(carte) ? (
+      {principal && (!peutEnvoyerContrat(carte) ? (
         <div className="card">
           <h2>Envoyer un contrat</h2>
           <p className="sub" style={{ margin: 0 }}>{etatCarte(carte).libelle}. Coacher contre rémunération, même à distance, demande un diplôme reconnu
