@@ -60,8 +60,8 @@ const emailDe = async (id: string) => (await admin.auth.admin.getUserById(id)).d
 const nomDe = async (id: string | null) => id ? (await admin.from('profiles').select('nom').eq('id', id).maybeSingle()).data?.nom || '' : ''
 
 // ---------- PDF du contrat (polices standard : caractères WinAnsi seulement) ----------
-const WINANSI = new Set('€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ')
-const pdfTexte = (s: string) => [...s.replace(/[   ]/g, ' ').replace(/[‐‑]/g, '-')]
+const WINANSI = new Set('\u20ac\u201a\u0192\u201e\u2026\u2020\u2021\u02c6\u2030\u0160\u2039\u0152\u017d\u2018\u2019\u201c\u201d\u2022\u2013\u2014\u02dc\u2122\u0161\u203a\u0153\u017e\u0178')
+const pdfTexte = (s: string) => [...s.replace(/[\u202f\u2009\u2007]/g, ' ').replace(/[\u2010\u2011]/g, '-')]
   .map((c) => { const n = c.charCodeAt(0); return (n >= 32 && n <= 126) || (n >= 160 && n <= 255) || WINANSI.has(c) ? c : n === 9 ? ' ' : '' }).join('')
 
 async function pdfContrat(k: Record<string, any>, preuve: Record<string, any> | null, coach: string, athlete: string) {
@@ -312,7 +312,7 @@ async function suivi(cle: string | undefined, app: string, c: Record<string, str
           `• ${echapper(qui)} n’a plus accès à tes données (séances, nutrition, bilans, messages).`,
           ...assoc.map((a) => `• ${echapper(a.nom || 'Ton coach associé')}, coach associé, ne te suit plus non plus.`),
           ...ctr.map((k) => k.statut === 'resilie' ? `• Le contrat « ${echapper(k.titre)} » est résilié à cette date.` : `• La proposition de contrat « ${echapper(k.titre)} » est annulée.`),
-          `<strong>Ce qui reste :</strong> ${garde} Si tu rejoins un coach plus tard, il pourra les consulter.`,
+          `<strong>Ce qui reste :</strong> ${garde} Si tu rejoins un coach plus tard, ce coach pourra les consulter.`,
           'Une question sur un paiement ou sur ton contrat ? Réponds simplement à cet e-mail pour écrire à ton coach.'].filter(Boolean),
         bouton: 'Ouvrir l’app', lien: app,
       }
