@@ -7,6 +7,7 @@ import { toast } from '../lib/ui'
 import { STATUTS } from '../lib/contrat'
 import { MATERIEL, NIVEAUX, OBJECTIFS } from '../lib/listes'
 import { CartesCoachs } from '../lib/cartePro'
+import { envoyerEmail } from '../lib/envois'
 
 // Profil de l'athlète : ses coachs, ses bilans envoyés et les infos utiles au coach
 export default function AthleteProfil() {
@@ -16,13 +17,16 @@ export default function AthleteProfil() {
   const [bilans, setBilans] = useState(null)
   const [contrats, setContrats] = useState([])
 
-  useEffect(() => {
+  const charger = () => {
     supabase.from('coachings').select('id, coach_id, principal, perimetre, coach:profiles!coachings_coach_id_fkey(nom)')
       .eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
-    supabase.from('bilans').select('id, type, statut, created_at, envoye_at, reponse_coach').eq('athlete_id', profil.id)
-      .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
     supabase.from('contrats').select('id, titre, statut, created_at, accepte_at').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).then(({ data }) => setContrats(data ?? []))
+  }
+  useEffect(() => {
+    charger()
+    supabase.from('bilans').select('id, type, statut, created_at, envoye_at, reponse_coach').eq('athlete_id', profil.id)
+      .order('created_at', { ascending: false }).then(({ data }) => setBilans(data ?? []))
     supabase.from('athlete_profiles').select('*').eq('athlete_id', profil.id).single().then(({ data }) => setF(data))
   }, [profil.id])
 
@@ -107,6 +111,56 @@ export default function AthleteProfil() {
           <input type="text" value={f.blessures} onChange={(e) => maj('blessures', e.target.value)} placeholder="Optionnel" /></label>
         <div className="row"><button className="btn">Enregistrer</button></div>
       </form>
+
+      {coachs.length > 0 && <FinSuivi coachs={coachs} contrats={contrats} onFait={charger} />}
     </>
+  )
+}
+
+// L'athlète met fin lui-même à son suivi (tous ses coachs)
+function FinSuivi({ coachs, contrats, onFait }) {
+  const [ouvert, setOuvert] = useState(false)
+  const [motif, setMotif] = useState('')
+  const [occupe, setOccupe] = useState(false)
+  const noms = coachs.map((c) => c.coach?.nom || 'ton coach').join(', ')
+  const enCours = contrats.filter((c) => c.statut === 'accepte' || c.statut === 'envoye')
+
+  async function confirmer() {
+    setOccupe(true)
+    const { data: ev, error } = await supabase.rpc('quitter_suivi', { p_motif: motif || null })
+    if (error) { setOccupe(false); return toast(error.message) }
+    const erreur = await envoyerEmail('suivi', ev)
+    setOccupe(false); setOuvert(false); setMotif('')
+    toast(erreur ? 'Suivi terminé. L’e-mail de confirmation partira dans quelques minutes.' : 'Suivi terminé : tu as reçu un e-mail de confirmation.')
+    onFait()
+  }
+
+  return (
+    <div className="card">
+      <h2>Mettre fin à mon suivi</h2>
+      {!ouvert ? (
+        <>
+          <p className="sub" style={{ margin: 0 }}>Tu peux arrêter ton suivi à tout moment. Tu gardes ton compte et tout ton historique.</p>
+          <div className="row"><button className="btn sm danger" onClick={() => setOuvert(true)}>Mettre fin à mon suivi</button></div>
+        </>
+      ) : (
+        <div className="gestion">
+          <strong>Ce qui va se passer</strong>
+          <ul className="sub">
+            <li>{noms} {coachs.length > 1 ? 'n’auront' : 'n’aura'} plus accès à tes données (séances, nutrition, bilans, messages) et {coachs.length > 1 ? 'recevront' : 'recevra'} un e-mail.</li>
+            {enCours.map((c) => <li key={c.id}>{c.statut === 'accepte' ? `Le contrat « ${c.titre} » sera résilié aujourd’hui.` : `La proposition de contrat « ${c.titre} » sera annulée.`}</li>)}
+            {enCours.some((c) => c.statut === 'accepte') && <li>Si tu as accepté ton contrat il y a moins de 14 jours, tu peux plutôt te rétracter depuis le contrat (Mes contrats).</li>}
+            <li>Ton compte, ton historique, ton programme et ton plan restent dans ton espace.</li>
+            <li>Tu reçois un e-mail qui récapitule tout ça.</li>
+          </ul>
+          <label className="field"><span className="label">Un mot pour ton coach (facultatif)</span>
+            <textarea rows={2} maxLength={500} value={motif} onChange={(e) => setMotif(e.target.value)} placeholder="Ex. : j’ai atteint mon objectif, merci !" /></label>
+          <div className="row">
+            <button className="btn sm danger" disabled={occupe} onClick={confirmer}>{occupe ? 'Un instant…' : 'Confirmer la fin du suivi'}</button>
+            <button className="btn ghost sm" disabled={occupe} onClick={() => { setOuvert(false); setMotif('') }}>Annuler</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }

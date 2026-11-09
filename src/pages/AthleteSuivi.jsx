@@ -23,7 +23,7 @@ export default function AthleteSuivi() {
   const [lien, setLien] = useState(null)
   const { profil } = useSession()
   const nav = useNavigate()
-  const chargerLien = () => supabase.from('coachings').select('principal, pause_depuis, pause_motif')
+  const chargerLien = () => supabase.from('coachings').select('principal, pause_depuis, pause_motif, pause_jusqu_au')
     .eq('athlete_id', id).eq('coach_id', profil.id).maybeSingle().then(({ data }) => setLien(data))
 
   useEffect(() => {

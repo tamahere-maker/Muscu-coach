@@ -267,7 +267,8 @@ const jourLong = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: '
 
 async function suivi(cle: string | undefined, app: string, c: Record<string, string>, userId: string | null, id: string) {
   const { data: ev } = await admin.from('evenements_suivi').select('*').eq('id', id).maybeSingle()
-  if (!ev || (userId && ev.coach_id !== userId)) return json({ erreur: 'Action introuvable' }, 404)
+  const parAthlete = !!ev?.details?.par_athlete
+  if (!ev || (userId && userId !== (parAthlete ? ev.athlete_id : ev.coach_id))) return json({ erreur: 'Action introuvable' }, 404)
   // Réservation : une seule notification par action
   const { data: pris } = await admin.from('evenements_suivi').update({ notifie_at: new Date().toISOString() })
     .eq('id', id).is('notifie_at', null).select('id')
@@ -281,26 +282,59 @@ async function suivi(cle: string | undefined, app: string, c: Record<string, str
     const garde = 'Ton compte, ton historique de séances, tes mesures, tes bilans, ton programme et ton plan alimentaire restent dans ton espace : rien n’est effacé.'
     let mail: { sujet: string; titre: string; paragraphes: string[]; bouton?: string; lien?: string } | null = null
     let push: { titre: string; corps: string } | null = null
-    const autres: { id: string; sujet: string; titre: string; paragraphes: string[] }[] = []
+    const autres: { id: string; sujet: string; titre: string; paragraphes: string[]; lien?: string }[] = []
 
-    if (ev.type === 'pause') {
+    const date = (j: string) => new Date(j + 'T12:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })
+    if (ev.type === 'pause' && d.rappel) {
+      // Rappel au coach principal : pause longue, rien pour l'athlète
+      const jours = Math.round((Date.now() - new Date(d.depuis).getTime()) / 86400000)
+      autres.push({ id: ev.coach_id, sujet: `Le suivi de ${athlete} est en pause depuis ${jours} jours`, titre: 'Pause toujours en cours',
+        paragraphes: [`Le suivi de <strong>${echapper(athlete)}</strong> est en pause depuis le ${jourLong(d.depuis)}, soit ${jours} jours.`,
+          'Tu peux le reprendre, fixer une date de reprise ou y mettre fin depuis sa fiche (bouton « Gérer »). Sans action de ta part, tu recevras ce rappel tous les 30 jours.'],
+        lien: `${app}/athletes/${ev.athlete_id}` })
+    } else if (ev.type === 'pause') {
       push = { titre: 'Suivi en pause', corps: `${qui} a mis ton suivi en pause.` }
       mail = {
         sujet: 'Ton suivi est en pause', titre: 'Ton suivi est en pause',
         paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a mis ton suivi en pause le ${quand}.`, motif,
           '<strong>Ce qui change :</strong> ton coach ne reçoit plus d’alertes sur tes séances et tes bilans, et tu ne reçois plus de notifications quand ton programme ou ton plan est modifié.',
           `<strong>Ce qui ne change pas :</strong> ${garde} Tu peux continuer à t’entraîner et à écrire à ton coach depuis l’app. Ton contrat n’est pas modifié par la pause.`,
-          'Un e-mail te préviendra dès que ton suivi reprendra.'].filter(Boolean),
+          d.jusqu_au ? `Reprise prévue le <strong>${date(d.jusqu_au)}</strong> : ton suivi repartira tout seul ce jour-là, et un e-mail te le confirmera.` : 'Un e-mail te préviendra dès que ton suivi reprendra.'].filter(Boolean),
         bouton: 'Ouvrir l’app', lien: app,
       }
     } else if (ev.type === 'reprise') {
-      push = { titre: 'Ton suivi reprend', corps: `${qui} a repris ton suivi.` }
+      push = { titre: 'Ton suivi reprend', corps: d.auto ? `Fin de la pause : ton suivi avec ${qui} reprend.` : `${qui} a repris ton suivi.` }
+      if (d.auto) autres.push({ id: ev.coach_id, sujet: `Le suivi de ${athlete} reprend aujourd’hui`, titre: 'Fin de la pause',
+        paragraphes: [`La pause de <strong>${echapper(athlete)}</strong> se terminait aujourd’hui : son suivi a repris automatiquement, et l’athlète a reçu un e-mail.`,
+          'Ce suivi réapparaît dans ton tableau de bord et dans les alertes « À relancer ».'], lien: `${app}/athletes/${ev.athlete_id}` })
       mail = {
         sujet: 'Ton suivi reprend', titre: 'Ton suivi reprend',
-        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a repris ton suivi le ${quand}.`, motif,
+        paragraphes: [d.auto ? `Bonjour ${echapper(athlete)}, ta pause est terminée : ton suivi avec <strong>${echapper(qui)}</strong> reprend aujourd’hui, comme prévu.`
+          : `Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a repris ton suivi le ${quand}.`, motif,
           'Ton coach voit de nouveau tes séances et tes bilans dans ses alertes, et tu reçois de nouveau une notification quand ton programme ou ton plan change.'].filter(Boolean),
         bouton: 'Voir mon programme', lien: app,
       }
+    } else if (ev.type === 'fin' && parAthlete) {
+      // L'athlète a mis fin lui-même à son suivi : confirmation pour lui, e-mail à chacun de ses coachs
+      const assoc: { id: string; nom: string }[] = d.associes ?? []
+      const ctr: { titre: string; statut: string }[] = d.contrats ?? []
+      const coachs = [qui, ...assoc.map((a) => a.nom).filter(Boolean)].map(echapper).join(', ')
+      const motifA = ev.motif ? `Ton message : « ${echapper(ev.motif)} »` : ''
+      push = { titre: 'Fin de ton suivi', corps: 'Ton suivi est terminé, comme tu l’as demandé.' }
+      mail = {
+        sujet: 'Tu as mis fin à ton suivi', titre: 'Ton suivi est terminé',
+        paragraphes: [`Bonjour ${echapper(athlete)}, tu as mis fin à ton suivi le ${quand}.`, motifA,
+          '<strong>Ce qui a été fait :</strong>',
+          `• ${coachs} ${assoc.length ? 'n’ont' : 'n’a'} plus accès à tes données (séances, nutrition, bilans, messages) et ${assoc.length ? 'ont' : 'a'} reçu un e-mail.`,
+          ...ctr.map((k) => k.statut === 'resilie' ? `• Le contrat « ${echapper(k.titre)} » est résilié à cette date.` : `• La proposition de contrat « ${echapper(k.titre)} » est annulée.`),
+          `<strong>Ce qui reste :</strong> ${garde} Si tu rejoins un coach plus tard, ce coach pourra les consulter.`,
+          'Une question sur un paiement ou sur ton contrat ? Réponds simplement à cet e-mail pour écrire à ton coach.'].filter(Boolean),
+        bouton: 'Ouvrir l’app', lien: app,
+      }
+      for (const x of [{ id: ev.coach_id }, ...assoc]) autres.push({ id: x.id, sujet: `${athlete} a mis fin à son suivi`, titre: `${athlete} a mis fin à son suivi`,
+        paragraphes: [`<strong>${echapper(athlete)}</strong> a mis fin à son suivi le ${quand}.`, ev.motif ? `Son message : « ${echapper(ev.motif)} »` : '',
+          ctr.length ? `Contrat${ctr.length > 1 ? 's' : ''} concerné${ctr.length > 1 ? 's' : ''} : ${ctr.map((k) => `« ${echapper(k.titre)} » (${k.statut === 'resilie' ? 'résilié' : 'annulé'})`).join(', ')}.` : '',
+          'Tu n’as plus accès à ses données, et ce suivi est passé dans « Anciens athlètes ».'].filter(Boolean) })
     } else if (ev.type === 'fin') {
       const assoc: { id: string; nom: string }[] = d.associes ?? []
       const ctr: { titre: string; statut: string }[] = d.contrats ?? []
@@ -344,15 +378,15 @@ async function suivi(cle: string | undefined, app: string, c: Record<string, str
         paragraphes: [`<strong>${echapper(qui)}</strong>, coach principal, t’a retiré du suivi de <strong>${echapper(athlete)}</strong> le ${quand}.`, motif,
           'Tu n’as plus accès à ses données, et ce suivi n’apparaît plus dans ta liste d’athlètes.'].filter(Boolean) })
     }
-    if (!mail || !push) return json({ erreur: 'Action inconnue' }, 400)
+    if (!autres.length && (!mail || !push)) return json({ erreur: 'Action inconnue' }, 400)
 
-    await pousser(c, ev.athlete_id, { ...push, url: '/', tag: `suivi-${ev.type}` })
+    if (push) await pousser(c, ev.athlete_id, { ...push, url: '/', tag: `suivi-${ev.type}` })
     let mails = 0
-    if (cle && mailAthlete) {
+    if (cle && mailAthlete && mail) {
       await envoyerMail(cle, {
-        to: [mailAthlete], reply_to: mailAuteur ?? undefined, subject: mail.sujet,
+        to: [mailAthlete], reply_to: d.auto ? undefined : mailAuteur ?? undefined, subject: mail.sujet,
         html: gabarit({ titre: mail.titre, paragraphes: mail.paragraphes, bouton: mail.bouton, lien: mail.lien,
-          pied: 'E-mail envoyé automatiquement par Muscu Coach à la suite d’une action de ton coach. Pour lui écrire, réponds à cet e-mail.' }),
+          pied: parAthlete ? 'E-mail envoyé automatiquement par Muscu Coach. Pour écrire à ton coach, réponds à cet e-mail.' : 'E-mail envoyé automatiquement par Muscu Coach à la suite d’une action de ton coach. Pour lui écrire, réponds à cet e-mail.' }),
       })
       mails++
     }
@@ -360,8 +394,8 @@ async function suivi(cle: string | undefined, app: string, c: Record<string, str
       const adr = cle ? await emailDe(o.id) : null
       if (!adr) continue
       try {
-        await envoyerMail(cle!, { to: [adr], reply_to: mailAuteur ?? undefined, subject: o.sujet,
-          html: gabarit({ titre: o.titre, paragraphes: o.paragraphes, bouton: 'Ouvrir l’app', lien: app }) })
+        await envoyerMail(cle!, { to: [adr], reply_to: parAthlete ? mailAthlete ?? undefined : o.id === ev.coach_id ? undefined : mailAuteur ?? undefined, subject: o.sujet,
+          html: gabarit({ titre: o.titre, paragraphes: o.paragraphes, bouton: 'Ouvrir l’app', lien: o.lien ?? app }) })
         mails++
       } catch (e) { console.error('suivi coach', o.id, (e as Error).message) }
     }
