@@ -384,9 +384,9 @@ async function suivi(cle: string | undefined, app: string, c: Record<string, str
     let mails = 0
     if (cle && mailAthlete && mail) {
       await envoyerMail(cle, {
-        to: [mailAthlete], reply_to: (parAthlete || d.auto) ? undefined : mailAuteur ?? undefined, subject: mail.sujet,
+        to: [mailAthlete], reply_to: d.auto ? undefined : mailAuteur ?? undefined, subject: mail.sujet,
         html: gabarit({ titre: mail.titre, paragraphes: mail.paragraphes, bouton: mail.bouton, lien: mail.lien,
-          pied: parAthlete ? 'E-mail envoyé automatiquement par Muscu Coach.' : 'E-mail envoyé automatiquement par Muscu Coach à la suite d’une action de ton coach. Pour lui écrire, réponds à cet e-mail.' }),
+          pied: parAthlete ? 'E-mail envoyé automatiquement par Muscu Coach. Pour écrire à ton coach, réponds à cet e-mail.' : 'E-mail envoyé automatiquement par Muscu Coach à la suite d’une action de ton coach. Pour lui écrire, réponds à cet e-mail.' }),
       })
       mails++
     }
