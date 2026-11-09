@@ -21,7 +21,7 @@ export default function AthleteEntrainement({ perso = false }) {
   const enCours = lireEnCours()
 
   useEffect(() => {
-    supabase.from('coachings').select('id, principal, pause_depuis, coach:profiles!coachings_coach_id_fkey(nom)').eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
+    supabase.from('coachings').select('id, principal, pause_depuis, pause_jusqu_au, coach:profiles!coachings_coach_id_fkey(nom)').eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     chargerProgramme(profil.id).then(({ data }) => setProg(data))
     supabase.from('seances_realisees').select('id, seance_id, nom, date, series_realisees(id)').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => setFaites(data ?? []))
@@ -63,7 +63,7 @@ export default function AthleteEntrainement({ perso = false }) {
       {!perso && coachs.some((c) => c.pause_depuis) && (
         <div className="card">
           <strong>Ton suivi est en pause depuis le {new Date(coachs.find((c) => c.pause_depuis).pause_depuis).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</strong>
-          <span className="sub">{coachs.find((c) => c.principal)?.coach?.nom || 'Ton coach'} reprendra ton suivi plus tard. En attendant, tu peux continuer à t’entraîner et à lui écrire.</span>
+          <span className="sub">{coachs.find((c) => c.principal)?.coach?.nom || 'Ton coach'} reprendra ton suivi {coachs.find((c) => c.pause_jusqu_au) ? `le ${new Date(coachs.find((c) => c.pause_jusqu_au).pause_jusqu_au + 'T12:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}` : 'plus tard'}. En attendant, tu peux continuer à t’entraîner et à lui écrire.</span>
         </div>
       )}
 

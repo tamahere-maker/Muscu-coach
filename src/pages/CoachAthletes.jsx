@@ -31,7 +31,7 @@ export default function CoachAthletes() {
   async function charger() {
     const [c, i, a] = await Promise.all([
       supabase.from('coachings')
-        .select('id, principal, perimetre, pause_depuis, pause_motif, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif), bilans!bilans_athlete_id_fkey(statut))')
+        .select('id, principal, perimetre, pause_depuis, pause_motif, pause_jusqu_au, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif), bilans!bilans_athlete_id_fkey(statut))')
         .eq('coach_id', profil.id).order('created_at'),
       supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at, email_envoye_at')
         .eq('statut', 'envoyee').order('created_at', { ascending: false }),
