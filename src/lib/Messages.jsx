@@ -89,6 +89,8 @@ export function BandeauNotifications() {
 
 // Rubrique « Notifications » de Mon compte
 export function CarteNotifications() {
+  const { profil } = useSession()
+  const athlete = profil?.role === 'athlete'
   const [etat, relire] = useEtatPush()
   const [occupe, setOccupe] = useState(false)
   const agir = (f, ok) => { setOccupe(true); f().then(() => toast(ok), (e) => toast(e.message)).finally(() => { setOccupe(false); relire() }) }
@@ -97,15 +99,38 @@ export function CarteNotifications() {
     <div className="card">
       <h2>Notifications</h2>
       <p className="sub" style={{ margin: 0 }}>{{
-        actif: 'Cet appareil reçoit une notification à chaque nouveau message.',
-        inactif: 'Reçois une notification sur cet appareil à chaque nouveau message, même quand l’app est fermée.',
+        actif: athlete ? 'Cet appareil reçoit une notification à chaque nouveau message et quand ton coach modifie ton programme ou ton plan alimentaire.'
+          : 'Cet appareil reçoit une notification à chaque nouveau message.',
+        inactif: athlete ? 'Reçois une notification sur cet appareil à chaque nouveau message et quand ton coach modifie ton programme ou ton plan alimentaire, même quand l’app est fermée.'
+          : 'Reçois une notification sur cet appareil à chaque nouveau message, même quand l’app est fermée.',
         refuse: 'Les notifications sont bloquées pour ce site dans les réglages du navigateur. Autorise-les puis reviens ici.',
         ios: 'Sur iPhone, les notifications fonctionnent une fois l’app installée : dans Safari, touche Partager puis Sur l’écran d’accueil, et ouvre l’app depuis l’icône.',
         indisponible: 'Ce navigateur ne permet pas les notifications.',
       }[etat]}</p>
       {etat === 'inactif' && <div className="row"><button className="btn" disabled={occupe} onClick={() => agir(activerPush, 'Notifications activées')}>Activer les notifications</button></div>}
       {etat === 'actif' && <div className="row"><button className="btn ghost" disabled={occupe} onClick={() => agir(desactiverPush, 'Notifications désactivées')}>Désactiver sur cet appareil</button></div>}
+      {athlete && <EmailsMaj />}
     </div>
+  )
+}
+
+// Athlète : e-mail quand le coach modifie le programme ou le plan alimentaire (colonne profiles.emails_maj)
+function EmailsMaj() {
+  const { profil } = useSession()
+  const [actif, setActif] = useState(null)
+  useEffect(() => {
+    supabase.from('profiles').select('emails_maj').eq('id', profil.id).maybeSingle().then(({ data, error }) => setActif(error ? null : data?.emails_maj ?? true))
+  }, [profil.id])
+  if (actif === null) return null
+  async function changer(v) {
+    setActif(v)
+    const { error } = await supabase.from('profiles').update({ emails_maj: v }).eq('id', profil.id)
+    if (error) { setActif(!v); return toast(error.message) }
+    toast(v ? 'E-mails de mise à jour activés' : 'E-mails de mise à jour coupés')
+  }
+  return (
+    <label className="coche"><input type="checkbox" checked={actif} onChange={(e) => changer(e.target.checked)} />
+      <span>Recevoir aussi un e-mail quand mon coach modifie mon programme ou mon plan alimentaire</span></label>
   )
 }
 

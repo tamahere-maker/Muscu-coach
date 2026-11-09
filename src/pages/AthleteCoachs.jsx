@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
+import { ResultatInvitation, envoyerEmail } from '../lib/envois'
 
 export const PERIMETRES = ['Entraînement et nutrition', 'Entraînement', 'Nutrition']
 const lienDe = (token) => `${window.location.origin}/invitation-coach/${token}`
@@ -19,7 +20,7 @@ export default function AthleteCoachs({ id, prix }) {
     const [c, i] = await Promise.all([
       supabase.from('coachings').select('id, coach_id, principal, perimetre, part_pct, coach:profiles!coachings_coach_id_fkey(nom)')
         .eq('athlete_id', id).order('principal', { ascending: false }).order('created_at'),
-      supabase.from('invitations_coach').select('id, email, perimetre, part_pct, token').eq('athlete_id', id).eq('statut', 'envoyee').order('created_at'),
+      supabase.from('invitations_coach').select('id, email, perimetre, part_pct, token, email_envoye_at').eq('athlete_id', id).eq('statut', 'envoyee').order('created_at'),
     ])
     setCoachs(c.data ?? [])
     setInvits(i.data ?? [])
@@ -40,9 +41,19 @@ export default function AthleteCoachs({ id, prix }) {
     if (totalParts(null, part) > 100) return setErr(`Il ne reste que ${fmt(partPrincipal)} % à répartir.`)
     const { data, error } = await supabase.from('invitations_coach')
       .insert({ athlete_id: id, invite_par: profil.id, email: f.email.trim().toLowerCase(), perimetre: f.perimetre, part_pct: part })
-      .select('token').single()
+      .select('id, token').single()
     if (error) return setErr(error.message)
-    setNouveau(lienDe(data.token)); setF({ email: '', perimetre: PERIMETRES[0], part: '' })
+    const adresse = f.email.trim().toLowerCase()
+    setF({ email: '', perimetre: PERIMETRES[0], part: '' })
+    setNouveau({ lien: lienDe(data.token), email: adresse, etat: 'envoi' })
+    const erreur = await envoyerEmail('invitation_coach', data.id)
+    setNouveau({ lien: lienDe(data.token), email: adresse, etat: erreur ? 'echec' : 'ok', erreur })
+    charger()
+  }
+
+  async function renvoyer(i) {
+    const erreur = await envoyerEmail('invitation_coach', i.id)
+    toast(erreur || `E-mail renvoyé à ${i.email}`)
     charger()
   }
 
@@ -100,6 +111,7 @@ export default function AthleteCoachs({ id, prix }) {
               <span>{i.email} <span className="pill warn">Invitation envoyée</span> <span className="pill">{i.perimetre} · {fmt(i.part_pct)} %</span></span>
               {principal && (
                 <span className="row">
+                  <button className="btn ghost sm" onClick={() => renvoyer(i)}>{i.email_envoye_at ? 'Renvoyer l’e-mail' : 'Envoyer par e-mail'}</button>
                   <button className="btn ghost sm" onClick={() => copier(lienDe(i.token))}>Copier le lien</button>
                   <button className="linkbtn" onClick={() => annuler(i)}>Annuler</button>
                 </span>
@@ -125,11 +137,8 @@ export default function AthleteCoachs({ id, prix }) {
               <input type="number" min="0" max={partPrincipal} step="1" value={f.part} onChange={(e) => setF({ ...f, part: e.target.value })} placeholder="0" /></label>
           </div>
           {err && <p className="err">{err}</p>}
-          <div className="row"><button className="btn">Créer l’invitation</button></div>
-          {nouveau && (
-            <div className="lien"><code>{nouveau}</code>
-              <button type="button" className="btn ghost sm" onClick={() => copier(nouveau)}>Copier le lien</button></div>
-          )}
+          <div className="row"><button className="btn" disabled={nouveau?.etat === 'envoi'}>Envoyer l’invitation</button></div>
+          <ResultatInvitation nouveau={nouveau} copier={copier} />
         </form>
       )}
     </>

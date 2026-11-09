@@ -4,6 +4,7 @@ import { useSession } from '../lib/session'
 import { supabase } from '../lib/supabase'
 import { fmt, toast } from '../lib/ui'
 import { STATUTS, TexteContrat, empreinte } from '../lib/contrat'
+import { envoyerEmail } from '../lib/envois'
 
 const dateFr = (d) => new Date(d.length === 10 ? d + 'T12:00' : d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
 const heureFr = (d) => new Date(d).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
@@ -47,7 +48,9 @@ export default function Contrat() {
     })
     setOccupe(false)
     if (error) return toast(error.message)
-    toast('Contrat accepté. Bon entraînement !')
+    // Confirmation par e-mail avec le PDF (à l'athlète, copie au coach), envoyée une seule fois par le serveur
+    envoyerEmail('contrat', k.id)
+    toast('Contrat accepté. Tu vas le recevoir par e-mail en PDF.')
     nav('/')
   }
 
