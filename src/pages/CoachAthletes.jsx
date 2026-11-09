@@ -8,6 +8,7 @@ import { useNonLus } from '../lib/Messages'
 import TableauDeBord from '../lib/TableauDeBord'
 import { useDecroches } from '../lib/decroches'
 import { BandeauCarte, useCartePro } from '../lib/cartePro'
+import { ResultatInvitation, envoyerEmail } from '../lib/envois'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -19,6 +20,7 @@ export default function CoachAthletes() {
   const [prix, setPrix] = useState('')
   const [nouveau, setNouveau] = useState(null)
   const [err, setErr] = useState('')
+  const [envoi, setEnvoi] = useState(null) // id de l'invitation dont l'e-mail part
   const nonLus = useNonLus()
   const decroches = useDecroches(profil.id)
   const [carte] = useCartePro(profil.id)
@@ -28,7 +30,7 @@ export default function CoachAthletes() {
       supabase.from('coachings')
         .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif), bilans!bilans_athlete_id_fkey(statut))')
         .eq('coach_id', profil.id).order('created_at'),
-      supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at')
+      supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at, email_envoye_at')
         .eq('statut', 'envoyee').order('created_at', { ascending: false }),
     ])
     setSuivis(c.data ?? [])
@@ -39,11 +41,23 @@ export default function CoachAthletes() {
   async function inviter(e) {
     e.preventDefault()
     setErr('')
+    const adresse = email.trim().toLowerCase()
     const { data, error } = await supabase.from('invitations')
-      .insert({ coach_id: profil.id, email: email.trim().toLowerCase(), prix_eur: prix ? Number(prix) : null })
-      .select('token').single()
+      .insert({ coach_id: profil.id, email: adresse, prix_eur: prix ? Number(prix) : null })
+      .select('id, token').single()
     if (error) return setErr(error.message)
-    setNouveau(lienDe(data.token)); setEmail(''); setPrix('')
+    setEmail(''); setPrix('')
+    setNouveau({ lien: lienDe(data.token), email: adresse, etat: 'envoi' })
+    const erreur = await envoyerEmail('invitation', data.id)
+    setNouveau({ lien: lienDe(data.token), email: adresse, etat: erreur ? 'echec' : 'ok', erreur })
+    charger()
+  }
+
+  async function renvoyer(i) {
+    setEnvoi(i.id)
+    const erreur = await envoyerEmail('invitation', i.id)
+    setEnvoi(null)
+    toast(erreur || `E-mail renvoyé à ${i.email}`)
     charger()
   }
 
@@ -58,7 +72,7 @@ export default function CoachAthletes() {
     <>
       <div>
         <h1>Mes athlètes</h1>
-        <p className="sub">Invite un athlète avec son e-mail, puis envoie-lui le lien.</p>
+        <p className="sub">Invite un athlète avec son e-mail : il reçoit un lien pour créer son compte et te rejoindre.</p>
       </div>
 
       <BandeauCarte carte={carte} />
@@ -74,11 +88,8 @@ export default function CoachAthletes() {
             <input type="number" min="0" step="1" value={prix} onChange={(e) => setPrix(e.target.value)} placeholder="Optionnel" /></label>
         </div>
         {err && <p className="err">{err}</p>}
-        <div className="row"><button className="btn">Créer l’invitation</button></div>
-        {nouveau && (
-          <div className="lien"><code>{nouveau}</code>
-            <button type="button" className="btn ghost sm" onClick={() => copier(nouveau)}>Copier le lien</button></div>
-        )}
+        <div className="row"><button className="btn" disabled={nouveau?.etat === 'envoi'}>Envoyer l’invitation</button></div>
+        <ResultatInvitation nouveau={nouveau} copier={copier} />
       </form>
 
       {invits.length > 0 && (
@@ -87,8 +98,10 @@ export default function CoachAthletes() {
           <div className="liste">
             {invits.map((i) => (
               <div key={i.id}>
-                <span>{i.email}{i.prix_eur != null && <span className="pill">{fmt(i.prix_eur)} €</span>}</span>
+                <span>{i.email}{i.prix_eur != null && <span className="pill">{fmt(i.prix_eur)} €</span>}
+                  {i.email_envoye_at && <span className="pill ok">E-mail envoyé le {new Date(i.email_envoye_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>}</span>
                 <span className="row">
+                  <button className="btn ghost sm" disabled={envoi === i.id} onClick={() => renvoyer(i)}>{i.email_envoye_at ? 'Renvoyer l’e-mail' : 'Envoyer par e-mail'}</button>
                   <button className="btn ghost sm" onClick={() => copier(lienDe(i.token))}>Copier le lien</button>
                   <button className="linkbtn" onClick={() => annuler(i.id)}>Annuler</button>
                 </span>
