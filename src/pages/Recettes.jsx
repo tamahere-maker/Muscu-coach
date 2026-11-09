@@ -36,10 +36,15 @@ export default function Recettes() {
 
   const req = async (p) => { const { error } = await p; if (error) toast(error.message); charger() }
 
+  // Nouvelle recette : on demande son nom puis on ouvre tout de suite le choix du premier aliment
   async function nouvelle() {
-    const { error } = await supabase.from('recettes').insert({ coach_id: profil.id, nom: 'Nouvelle recette' })
+    const nom = prompt('Nom de la recette', 'Nouvelle recette')?.trim()
+    if (!nom) return
+    const { data, error } = await supabase.from('recettes').insert({ coach_id: profil.id, nom }).select('id, nom, note').single()
     if (error) return toast(error.message)
-    charger()
+    await charger()
+    setQ('')
+    setAjoutDans({ ...data, recette_aliments: [] })
   }
   async function supprimer(r) {
     if (!confirm(`Supprimer la recette « ${r.nom} » ? Les plans où elle a été ajoutée ne changent pas.`)) return
@@ -72,7 +77,7 @@ export default function Recettes() {
             </div>
             <input type="text" aria-label={`Note pour ${r.nom}`} defaultValue={r.note} placeholder="Note (ex. cuire les flocons 3 min dans le lait)"
               onBlur={(e) => e.target.value !== r.note && req(supabase.from('recettes').update({ note: e.target.value }).eq('id', r.id))} />
-            {r.recette_aliments.length === 0 && <p className="empty">Aucun aliment.</p>}
+            {r.recette_aliments.length === 0 && <p className="empty">Aucun aliment : ajoute-en pour pouvoir utiliser cette recette dans un plan.</p>}
             {r.recette_aliments.map((l) => {
               const a = alim[l.aliment_id]
               if (!a) return null
