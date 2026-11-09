@@ -133,10 +133,12 @@ export default function PlanEditeur() {
 
   // Recette du coach : ses aliments sont copiés dans le repas
   async function choisirRecette(rec) {
+    const n = rec.recette_aliments.length
+    if (!n) return toast(`« ${rec.nom} » ne contient aucun aliment : ajoute-les dans Bibliothèque › Recettes`)
     const { error } = await supabase.rpc('ajouter_recette', { rec: rec.id, rp: choix.repas.id })
     if (error) return toast(error.message)
     dlg.current.close()
-    toast(`${rec.nom} ajoutée`)
+    toast(`${rec.nom} ajoutée (${n} aliment${n > 1 ? 's' : ''})`)
     charger()
   }
   async function enregistrerRecette(r) {
@@ -305,7 +307,7 @@ export default function PlanEditeur() {
             )
           })}
           <div className="row" style={{ justifyContent: 'space-between' }}>
-            <button className="btn ghost sm" onClick={() => { setQ(''); setChoix({ repas: r }) }}>+ Ajouter un aliment</button>
+            <button className="btn ghost sm" onClick={() => { setQ(''); chargerRecettes(); setChoix({ repas: r }) }}>+ Ajouter un aliment</button>
             <span className="sub">{resume(totalRepas(r))}</span>
           </div>
         </div>
@@ -363,10 +365,12 @@ export default function PlanEditeur() {
             <input type="search" autoFocus placeholder="Aliment, marque ou catégorie" value={q} onChange={(e) => setQ(e.target.value)} />
             <div className="pick-list">
               {choix.repas && recettesTrouvees.map((rec) => (
-                <button key={rec.id} className="pick pick-aliment" onClick={() => choisirRecette(rec)}>
+                <button key={rec.id} className="pick pick-aliment" disabled={!rec.recette_aliments.length} onClick={() => choisirRecette(rec)}>
                   <span><strong>{rec.nom}</strong><br />
-                    <small className="sub">Recette · {rec.recette_aliments.length} aliment{rec.recette_aliments.length > 1 ? 's' : ''} · {resume(somme(rec.recette_aliments.filter((l) => alim[l.aliment_id]).map((l) => macrosDe(alim[l.aliment_id], l.grammes))))}</small></span>
-                  <span className="pill acc">Ajouter</span>
+                    <small className="sub">{rec.recette_aliments.length
+                      ? `Recette · ${rec.recette_aliments.length} aliment${rec.recette_aliments.length > 1 ? 's' : ''} · ${resume(somme(rec.recette_aliments.filter((l) => alim[l.aliment_id]).map((l) => macrosDe(alim[l.aliment_id], l.grammes))))}`
+                      : 'Recette vide : ajoute ses aliments dans Bibliothèque › Recettes'}</small></span>
+                  <span className="pill acc">{rec.recette_aliments.length ? 'Ajouter' : 'Vide'}</span>
                 </button>
               ))}
               {resultats.map((a) => (
