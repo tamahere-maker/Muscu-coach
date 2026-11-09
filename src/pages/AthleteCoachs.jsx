@@ -65,9 +65,11 @@ export default function AthleteCoachs({ id, prix }) {
   }
 
   async function retirer(c) {
-    if (!confirm(`Retirer ${c.coach?.nom || 'ce coach'} du suivi de cet athlète ?`)) return
-    const { error } = await supabase.from('coachings').delete().eq('id', c.id)
+    if (!confirm(`Retirer ${c.coach?.nom || 'ce coach'} du suivi de cet athlète ? Ce coach n’aura plus accès à ses données ; l’athlète et ce coach sont prévenus par e-mail.`)) return
+    const { data: ev, error } = await supabase.rpc('retirer_coach_associe', { c: c.id })
     if (error) return toast(error.message)
+    const erreur = await envoyerEmail('suivi', ev)
+    toast(erreur ? 'Coach retiré. L’e-mail partira dans quelques minutes.' : 'Coach retiré, e-mails envoyés.')
     charger()
   }
 

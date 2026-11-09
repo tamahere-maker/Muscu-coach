@@ -9,6 +9,7 @@ import TableauDeBord from '../lib/TableauDeBord'
 import { useDecroches } from '../lib/decroches'
 import { BandeauCarte, useCartePro } from '../lib/cartePro'
 import { ResultatInvitation, envoyerEmail } from '../lib/envois'
+import GestionSuivi from '../lib/GestionSuivi'
 
 const lienDe = (token) => `${window.location.origin}/invitation/${token}`
 
@@ -21,20 +22,28 @@ export default function CoachAthletes() {
   const [nouveau, setNouveau] = useState(null)
   const [err, setErr] = useState('')
   const [envoi, setEnvoi] = useState(null) // id de l'invitation dont l'e-mail part
+  const [anciens, setAnciens] = useState([])
+  const [version, setVersion] = useState(0) // rechargement du tableau de bord et des alertes après une pause ou une fin
   const nonLus = useNonLus()
-  const decroches = useDecroches(profil.id)
+  const decroches = useDecroches(profil.id, version)
   const [carte] = useCartePro(profil.id)
 
   async function charger() {
-    const [c, i] = await Promise.all([
+    const [c, i, a] = await Promise.all([
       supabase.from('coachings')
-        .select('id, principal, perimetre, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif), bilans!bilans_athlete_id_fkey(statut))')
+        .select('id, principal, perimetre, pause_depuis, pause_motif, athlete:profiles!coachings_athlete_id_fkey(id, nom, athlete_profiles(niveau, objectifs, materiel, seances_semaine, duree_min, blessures, sexe, poids_kg, taille_cm, age), programmes!programmes_athlete_id_fkey(id, nom, actif), plans_nutrition!plans_nutrition_athlete_id_fkey(id, nom, actif), bilans!bilans_athlete_id_fkey(statut))')
         .eq('coach_id', profil.id).order('created_at'),
       supabase.from('invitations').select('id, email, token, prix_eur, statut, created_at, email_envoye_at')
         .eq('statut', 'envoyee').order('created_at', { ascending: false }),
+      supabase.from('coachings_archives').select('id, athlete_id, nom_athlete, principal, debut_at, fin_at, motif')
+        .eq('coach_id', profil.id).order('fin_at', { ascending: false }).limit(50),
     ])
     setSuivis(c.data ?? [])
     setInvits(i.data ?? [])
+    // Anciens athlètes : la fin la plus récente de chacun, sauf ceux qui sont de nouveau suivis
+    const suivisIds = new Set((c.data ?? []).map((x) => x.athlete.id))
+    const vus = new Set()
+    setAnciens((a.data ?? []).filter((x) => !suivisIds.has(x.athlete_id) && !vus.has(x.athlete_id) && vus.add(x.athlete_id)))
   }
   useEffect(() => { charger() }, [])
 
@@ -77,7 +86,7 @@ export default function CoachAthletes() {
 
       <BandeauCarte carte={carte} />
 
-      <TableauDeBord nonLus={nonLus} decroches={decroches} />
+      <TableauDeBord key={version} nonLus={nonLus} decroches={decroches} />
 
       <form className="card" onSubmit={inviter}>
         <h2>Inviter un athlète</h2>
@@ -115,7 +124,7 @@ export default function CoachAthletes() {
         <h2>Athlètes suivis</h2>
         {suivis === null ? null : suivis.length === 0 ? <p className="empty">Aucun athlète pour l’instant.</p> : (
           <div className="liste">
-            {[...suivis].sort((x, y) => (decroches?.[y.athlete.id]?.gravite ?? 0) - (decroches?.[x.athlete.id]?.gravite ?? 0)).map((s) => {
+            {[...suivis].sort((x, y) => !!x.pause_depuis - !!y.pause_depuis || (decroches?.[y.athlete.id]?.gravite ?? 0) - (decroches?.[x.athlete.id]?.gravite ?? 0)).map((s) => {
               const p = s.athlete.athlete_profiles ?? {}
               const prog = s.athlete.programmes?.find((x) => x.actif)
               const plan = s.athlete.plans_nutrition?.find((x) => x.actif)
@@ -124,7 +133,8 @@ export default function CoachAthletes() {
                 <div key={s.id}>
                   <div className="athlete">
                     <strong>{s.athlete.nom || 'Sans nom'} {s.principal ? <span className="pill acc">Coach principal</span> : <span className="pill">Coach associé · {s.perimetre}</span>}
-                      {decroches?.[s.athlete.id]?.raisons.length > 0 && <span className="pill warn">À relancer</span>}</strong>
+                      {s.pause_depuis ? <span className="pill">En pause</span>
+                        : decroches?.[s.athlete.id]?.raisons.length > 0 && <span className="pill warn">À relancer</span>}</strong>
                     <span className="sub">
                       {[p.niveau, p.objectifs?.join(', '), p.seances_semaine && `${p.seances_semaine} séances/sem.`, p.duree_min && `${p.duree_min} min`]
                         .filter(Boolean).join(' · ') || 'Profil pas encore rempli'}
@@ -139,6 +149,7 @@ export default function CoachAthletes() {
                       : <Link className="linkbtn" to="/programmes">Attribuer un programme</Link>}
                     {!s.principal && s.perimetre === 'Entraînement' ? null : plan ? <Link className="btn ghost sm" to={`/nutrition/${plan.id}`}>{plan.nom}</Link>
                       : <Link className="linkbtn" to="/nutrition">Attribuer un plan</Link>}
+                    <GestionSuivi athleteId={s.athlete.id} nom={s.athlete.nom} lien={s} onFait={() => { charger(); setVersion((v) => v + 1) }} />
                   </span>
                 </div>
               )
@@ -146,6 +157,24 @@ export default function CoachAthletes() {
           </div>
         )}
       </div>
+
+      {anciens.length > 0 && (
+        <div className="card">
+          <h2>Anciens athlètes</h2>
+          <p className="sub" style={{ margin: 0 }}>Tu n’as plus accès à leurs données. Pour reprendre l’un d’eux, invite-le de nouveau : tu retrouveras son historique.</p>
+          <div className="liste">
+            {anciens.map((x) => (
+              <div key={x.id}>
+                <span className="athlete">
+                  <strong>{x.nom_athlete || 'Sans nom'}</strong>
+                  <span className="sub">Suivi du {new Date(x.debut_at).toLocaleDateString('fr-FR')} au {new Date(x.fin_at).toLocaleDateString('fr-FR')}
+                    {x.principal ? '' : ' (coach associé)'}{x.motif ? ` · ${x.motif}` : ''}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   )
 }

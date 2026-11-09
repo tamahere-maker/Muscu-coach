@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useSession } from '../lib/session'
+import GestionSuivi from '../lib/GestionSuivi'
 import { supabase } from '../lib/supabase'
 import Progres from '../lib/Progres'
 import AthleteBilans from './AthleteBilans'
@@ -18,6 +20,11 @@ export default function AthleteSuivi() {
   const vue = VUES.some(([k]) => k === params.get('vue')) ? params.get('vue') : 'seances'
   const [athlete, setAthlete] = useState(null)
   const [actifs, setActifs] = useState({})
+  const [lien, setLien] = useState(null)
+  const { profil } = useSession()
+  const nav = useNavigate()
+  const chargerLien = () => supabase.from('coachings').select('principal, pause_depuis, pause_motif')
+    .eq('athlete_id', id).eq('coach_id', profil.id).maybeSingle().then(({ data }) => setLien(data))
 
   useEffect(() => {
     supabase.from('profiles').select('id, nom, athlete_profiles(seances_semaine)').eq('id', id).single().then(({ data }) => setAthlete(data))
@@ -25,6 +32,7 @@ export default function AthleteSuivi() {
       supabase.from('programmes').select('id, nom, prix_eur').eq('athlete_id', id).eq('actif', true).maybeSingle(),
       supabase.from('plans_nutrition').select('id, nom').eq('athlete_id', id).eq('actif', true).maybeSingle(),
     ]).then(([p, n]) => setActifs({ prog: p.data, plan: n.data }))
+    chargerLien()
   }, [id])
 
   if (!athlete) return null
@@ -34,7 +42,11 @@ export default function AthleteSuivi() {
     <>
       <div>
         <Link className="linkbtn" to="/">← Mes athlètes</Link>
-        <h1 style={{ marginTop: 8 }}>Suivi de {athlete.nom}</h1>
+        <h1 style={{ marginTop: 8 }}>Suivi de {athlete.nom}{lien?.pause_depuis && <> <span className="pill">En pause</span></>}</h1>
+        <div className="row" style={{ marginBottom: 8 }}>
+          <GestionSuivi athleteId={id} nom={athlete.nom} lien={lien}
+            onFait={(type) => (type === 'fin' || type === 'depart' ? nav('/') : chargerLien())} />
+        </div>
         <div className="seg" role="group" aria-label="Vue">
           {VUES.map(([k, l]) => <button key={k} aria-pressed={vue === k} onClick={() => setParams({ vue: k }, { replace: true })}>{l}</button>)}
         </div>
