@@ -3,9 +3,12 @@
 //   { action: 'invitation', id }        → e-mail d'invitation à l'athlète (coach qui a créé l'invitation)
 //   { action: 'invitation_coach', id }  → e-mail d'invitation à un coach associé (coach principal qui l'a créée)
 //   { action: 'contrat', id }           → e-mail de confirmation du contrat accepté, PDF joint (une seule fois)
+//   { action: 'suivi', id }             → pause, reprise ou fin du suivi (evenements_suivi, migration 032) : push + e-mail
+//                                         à l'athlète, e-mail aux coachs concernés (coach auteur de l'action)
 // Appel de pg_cron (en-tête x-cle-cron, toutes les 5 min, voir migration 031) :
 //   { action: 'maj' } → push + e-mail à l'athlète quand son coach a modifié son programme ou son plan alimentaire,
 //                       regroupés : 10 min après la dernière modification, ou au bout d'une heure au plus tard.
+//                       Rattrape aussi les événements de suivi que l'app n'a pas pu notifier.
 // La clé Resend est lue dans le secret RESEND_API_KEY, sinon dans config_serveur (cle = 'resend_api_key').
 import webpush from 'npm:web-push@3.6.7'
 import { PDFDocument, StandardFonts, rgb } from 'npm:pdf-lib@1.17.1'
@@ -219,6 +222,9 @@ async function majRegroupees(cle: string | undefined, app: string, c: Record<str
     const prog = l.type === 'programme'
     const [coach, { data: p }] = await Promise.all([nomDe(l.coach_id), admin.from('profiles').select('nom, emails_maj, role').eq('id', l.athlete_id).maybeSingle()])
     if (!p || p.role !== 'athlete') continue
+    // Suivi en pause : pas de notification de mise à jour
+    const { data: pause } = await admin.from('coachings').select('id').eq('athlete_id', l.athlete_id).not('pause_depuis', 'is', null).limit(1)
+    if (pause?.length) continue
     const qui = coach || 'Ton coach'
     const quoi = prog ? `ton programme${l.nom ? ` « ${l.nom} »` : ''}` : `ton plan alimentaire${l.nom ? ` « ${l.nom} »` : ''}`
     const url = prog ? '/' : '/nutrition'
@@ -247,7 +253,123 @@ async function majRegroupees(cle: string | undefined, app: string, c: Record<str
       }
     }
   }
-  return json({ traitees: lignes?.length ?? 0, push, mails })
+  // Événements de suivi restés sans notification (app fermée juste après l'action, réseau coupé…)
+  const { data: evs } = await admin.from('evenements_suivi').select('id').is('notifie_at', null)
+    .lt('created_at', new Date(maintenant - 2 * 60000).toISOString()).limit(50)
+  for (const e of evs ?? []) {
+    try { await suivi(cle, app, c, null, e.id) } catch (err) { console.error('suivi', e.id, (err as Error).message) }
+  }
+  return json({ traitees: lignes?.length ?? 0, push, mails, suivi: evs?.length ?? 0 })
+}
+
+// ---------- Pause, reprise et fin du suivi ----------
+const jourLong = (d: string) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Europe/Paris' })
+
+async function suivi(cle: string | undefined, app: string, c: Record<string, string>, userId: string | null, id: string) {
+  const { data: ev } = await admin.from('evenements_suivi').select('*').eq('id', id).maybeSingle()
+  if (!ev || (userId && ev.coach_id !== userId)) return json({ erreur: 'Action introuvable' }, 404)
+  // Réservation : une seule notification par action
+  const { data: pris } = await admin.from('evenements_suivi').update({ notifie_at: new Date().toISOString() })
+    .eq('id', id).is('notifie_at', null).select('id')
+  if (!pris?.length) return json({ ok: true, deja: true })
+  try {
+    const d = ev.details ?? {}
+    const [auteur, athlete, mailAthlete, mailAuteur] = await Promise.all([nomDe(ev.coach_id), nomDe(ev.athlete_id), emailDe(ev.athlete_id), emailDe(ev.coach_id)])
+    const qui = auteur || 'Ton coach'
+    const motif = ev.motif ? `Message de ${echapper(qui)} : « ${echapper(ev.motif)} »` : ''
+    const quand = jourLong(ev.created_at)
+    const garde = 'Ton compte, ton historique de séances, tes mesures, tes bilans, ton programme et ton plan alimentaire restent dans ton espace : rien n’est effacé.'
+    let mail: { sujet: string; titre: string; paragraphes: string[]; bouton?: string; lien?: string } | null = null
+    let push: { titre: string; corps: string } | null = null
+    const autres: { id: string; sujet: string; titre: string; paragraphes: string[] }[] = []
+
+    if (ev.type === 'pause') {
+      push = { titre: 'Suivi en pause', corps: `${qui} a mis ton suivi en pause.` }
+      mail = {
+        sujet: 'Ton suivi est en pause', titre: 'Ton suivi est en pause',
+        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a mis ton suivi en pause le ${quand}.`, motif,
+          '<strong>Ce qui change :</strong> ton coach ne reçoit plus d’alertes sur tes séances et tes bilans, et tu ne reçois plus de notifications quand ton programme ou ton plan est modifié.',
+          `<strong>Ce qui ne change pas :</strong> ${garde} Tu peux continuer à t’entraîner et à écrire à ton coach depuis l’app. Ton contrat n’est pas modifié par la pause.`,
+          'Un e-mail te préviendra dès que ton suivi reprendra.'].filter(Boolean),
+        bouton: 'Ouvrir l’app', lien: app,
+      }
+    } else if (ev.type === 'reprise') {
+      push = { titre: 'Ton suivi reprend', corps: `${qui} a repris ton suivi.` }
+      mail = {
+        sujet: 'Ton suivi reprend', titre: 'Ton suivi reprend',
+        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a repris ton suivi le ${quand}.`, motif,
+          'Ton coach voit de nouveau tes séances et tes bilans dans ses alertes, et tu reçois de nouveau une notification quand ton programme ou ton plan change.'].filter(Boolean),
+        bouton: 'Voir mon programme', lien: app,
+      }
+    } else if (ev.type === 'fin') {
+      const assoc: { id: string; nom: string }[] = d.associes ?? []
+      const ctr: { titre: string; statut: string }[] = d.contrats ?? []
+      push = { titre: 'Fin de ton suivi', corps: `${qui} a mis fin à ton suivi.` }
+      mail = {
+        sujet: `${qui} a mis fin à ton suivi`, titre: 'Ton suivi est terminé',
+        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong> a mis fin à ton suivi le ${quand}.`, motif,
+          '<strong>Ce qui a été fait :</strong>',
+          `• ${echapper(qui)} n’a plus accès à tes données (séances, nutrition, bilans, messages).`,
+          ...assoc.map((a) => `• ${echapper(a.nom || 'Ton coach associé')}, coach associé, ne te suit plus non plus.`),
+          ...ctr.map((k) => k.statut === 'resilie' ? `• Le contrat « ${echapper(k.titre)} » est résilié à cette date.` : `• La proposition de contrat « ${echapper(k.titre)} » est annulée.`),
+          `<strong>Ce qui reste :</strong> ${garde} Si tu rejoins un coach plus tard, il pourra les consulter.`,
+          'Une question sur un paiement ou sur ton contrat ? Réponds simplement à cet e-mail pour écrire à ton coach.'].filter(Boolean),
+        bouton: 'Ouvrir l’app', lien: app,
+      }
+      for (const a of assoc) autres.push({ id: a.id, sujet: `Fin du suivi de ${athlete}`, titre: `Fin du suivi de ${athlete}`,
+        paragraphes: [`<strong>${echapper(qui)}</strong>, coach principal, a mis fin au suivi de <strong>${echapper(athlete)}</strong> le ${quand}.`,
+          'Tu n’as plus accès à ses données, et ce suivi n’apparaît plus dans ta liste d’athlètes.'] })
+    } else if (ev.type === 'depart_associe') {
+      const principal = d.principal ? await nomDe(d.principal) : ''
+      push = { titre: 'Changement de coach', corps: `${qui} ne fait plus partie de tes coachs.` }
+      mail = {
+        sujet: `${qui} ne fait plus partie de tes coachs`, titre: 'Changement dans ton équipe de coachs',
+        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong>, coach associé, a quitté ton suivi le ${quand}.`, motif,
+          `${echapper(qui)} n’a plus accès à tes données.${principal ? ` <strong>${echapper(principal)}</strong>, ton coach principal, continue de te suivre.` : ''}`, garde].filter(Boolean),
+        bouton: 'Ouvrir l’app', lien: app,
+      }
+      if (d.principal) autres.push({ id: d.principal, sujet: `${qui} a quitté le suivi de ${athlete}`, titre: 'Un coach associé est parti',
+        paragraphes: [`<strong>${echapper(qui)}</strong> a quitté le suivi de <strong>${echapper(athlete)}</strong> le ${quand}.`, motif,
+          'Pense à revoir la répartition du paiement et, si besoin, à inviter un autre coach associé.'].filter(Boolean) })
+    } else if (ev.type === 'retrait_associe') {
+      const nom = d.nom || 'Ton coach associé'
+      push = { titre: 'Changement de coach', corps: `${nom} ne fait plus partie de tes coachs.` }
+      mail = {
+        sujet: `${nom} ne fait plus partie de tes coachs`, titre: 'Changement dans ton équipe de coachs',
+        paragraphes: [`Bonjour ${echapper(athlete)}, <strong>${echapper(qui)}</strong>, ton coach principal, a retiré <strong>${echapper(nom)}</strong> de ton suivi le ${quand}.`, motif,
+          `${echapper(nom)} n’a plus accès à tes données. ${echapper(qui)} continue de te suivre.`, garde].filter(Boolean),
+        bouton: 'Ouvrir l’app', lien: app,
+      }
+      if (d.associe) autres.push({ id: d.associe, sujet: `Fin de ton suivi de ${athlete}`, titre: `Fin de ton suivi de ${athlete}`,
+        paragraphes: [`<strong>${echapper(qui)}</strong>, coach principal, t’a retiré du suivi de <strong>${echapper(athlete)}</strong> le ${quand}.`, motif,
+          'Tu n’as plus accès à ses données, et ce suivi n’apparaît plus dans ta liste d’athlètes.'].filter(Boolean) })
+    }
+    if (!mail || !push) return json({ erreur: 'Action inconnue' }, 400)
+
+    await pousser(c, ev.athlete_id, { ...push, url: '/', tag: `suivi-${ev.type}` })
+    let mails = 0
+    if (cle && mailAthlete) {
+      await envoyerMail(cle, {
+        to: [mailAthlete], reply_to: mailAuteur ?? undefined, subject: mail.sujet,
+        html: gabarit({ titre: mail.titre, paragraphes: mail.paragraphes, bouton: mail.bouton, lien: mail.lien,
+          pied: 'E-mail envoyé automatiquement par Muscu Coach à la suite d’une action de ton coach. Pour lui écrire, réponds à cet e-mail.' }),
+      })
+      mails++
+    }
+    for (const o of autres) {
+      const adr = cle ? await emailDe(o.id) : null
+      if (!adr) continue
+      try {
+        await envoyerMail(cle!, { to: [adr], reply_to: mailAuteur ?? undefined, subject: o.sujet,
+          html: gabarit({ titre: o.titre, paragraphes: o.paragraphes, bouton: 'Ouvrir l’app', lien: app }) })
+        mails++
+      } catch (e) { console.error('suivi coach', o.id, (e as Error).message) }
+    }
+    return json({ ok: true, mails })
+  } catch (e) {
+    await admin.from('evenements_suivi').update({ notifie_at: null }).eq('id', id)
+    throw e
+  }
 }
 
 Deno.serve(async (req) => {
@@ -264,8 +386,9 @@ Deno.serve(async (req) => {
     const jeton = req.headers.get('Authorization')?.replace(/^Bearer /, '') ?? ''
     const { data: { user } } = await admin.auth.getUser(jeton)
     if (!user) return json({ erreur: 'Non connecté' }, 401)
-    if (!cle) return json({ erreur: 'Envoi d’e-mails pas encore configuré' }, 503)
     if (typeof corps.id !== 'string') return json({ erreur: 'Paramètre manquant' }, 400)
+    if (corps.action === 'suivi') return await suivi(cle, app, c, user.id, corps.id)
+    if (!cle) return json({ erreur: 'Envoi d’e-mails pas encore configuré' }, 503)
     if (corps.action === 'invitation') return await invitation(cle, app, user.id, corps.id)
     if (corps.action === 'invitation_coach') return await invitationCoach(cle, app, user.id, corps.id)
     if (corps.action === 'contrat') return await contrat(cle, app, user.id, corps.id)

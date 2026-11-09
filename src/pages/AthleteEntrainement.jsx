@@ -21,7 +21,7 @@ export default function AthleteEntrainement({ perso = false }) {
   const enCours = lireEnCours()
 
   useEffect(() => {
-    supabase.from('coachings').select('id').eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
+    supabase.from('coachings').select('id, principal, pause_depuis, coach:profiles!coachings_coach_id_fkey(nom)').eq('athlete_id', profil.id).then(({ data }) => setCoachs(data ?? []))
     chargerProgramme(profil.id).then(({ data }) => setProg(data))
     supabase.from('seances_realisees').select('id, seance_id, nom, date, series_realisees(id)').eq('athlete_id', profil.id)
       .order('created_at', { ascending: false }).limit(30).then(({ data }) => setFaites(data ?? []))
@@ -59,6 +59,13 @@ export default function AthleteEntrainement({ perso = false }) {
           : !coachs.length ? 'Aucun coach pour l’instant : ouvre le lien d’invitation envoyé par ton coach.'
           : prog ? 'Choisis ta séance du jour.' : 'Ton coach prépare ton programme.'}</p>
       </div>
+
+      {!perso && coachs.some((c) => c.pause_depuis) && (
+        <div className="card">
+          <strong>Ton suivi est en pause depuis le {new Date(coachs.find((c) => c.pause_depuis).pause_depuis).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</strong>
+          <span className="sub">{coachs.find((c) => c.principal)?.coach?.nom || 'Ton coach'} reprendra ton suivi plus tard. En attendant, tu peux continuer à t’entraîner et à lui écrire.</span>
+        </div>
+      )}
 
       {aFaire.map((b) => (
         <Link key={b.id + b.type} className="card a-faire" to={b.id === 'nouveau' ? `/bilan/nouveau?type=${b.type}` : `/bilan/${b.id}`}>

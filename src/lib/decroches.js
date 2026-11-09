@@ -60,7 +60,7 @@ export function evaluer({ auj, debutSuivi, programme, faites, choix, bilans, jou
 // Charge les données de tous les athlètes du coach et renvoie { [athlete_id]: { raisons, gravite, joursPrevus } }
 // pour les athlètes à relancer (raisons non vide) ; joursPrevus = le programme actif fixe des jours d'entraînement.
 // null pendant le chargement.
-export function useDecroches(coachId) {
+export function useDecroches(coachId, version = 0) {
   const [res, setRes] = useState(null)
   useEffect(() => {
     if (!coachId) return
@@ -68,8 +68,10 @@ export function useDecroches(coachId) {
     ;(async () => {
       const auj = jourIso()
       const debut = decaler(auj, -FENETRE)
-      const { data: liens } = await supabase.from('coachings').select('athlete_id, principal, perimetre, created_at').eq('coach_id', coachId)
-      const ids = (liens ?? []).map((l) => l.athlete_id)
+      const { data: liens } = await supabase.from('coachings').select('athlete_id, principal, perimetre, created_at, pause_depuis').eq('coach_id', coachId)
+      // Athlètes en pause : pas d'alerte
+      const actifs = (liens ?? []).filter((l) => !l.pause_depuis)
+      const ids = actifs.map((l) => l.athlete_id)
       if (!ids.length) { if (!fini) setRes({}); return }
       const [p, f, c, b, s] = await Promise.all([
         supabase.from('programmes').select('athlete_id, jours_entrainement, created_at').in('athlete_id', ids).eq('actif', true),
@@ -81,7 +83,7 @@ export function useDecroches(coachId) {
       ])
       const par = (rows, id) => (rows ?? []).filter((r) => r.athlete_id === id)
       const out = {}
-      for (const l of liens) {
+      for (const l of actifs) {
         const id = l.athlete_id
         // Un coach associé « Nutrition » n'est pas concerné par les séances
         const seances = l.principal || l.perimetre !== 'Nutrition'
@@ -101,6 +103,6 @@ export function useDecroches(coachId) {
       if (!fini) setRes(out)
     })()
     return () => { fini = true }
-  }, [coachId])
+  }, [coachId, version])
   return res
 }
